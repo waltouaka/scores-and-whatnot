@@ -51,7 +51,7 @@ select{font:600 1rem var(--b);padding:.45rem .7rem;background:var(--paper2);colo
 .strip i.fg{background:var(--paper);width:10px;height:10px}
 .plays{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
 .plays li{border-bottom:1px solid var(--line)}.plays li:last-child{border:0}
-.pl{display:grid;grid-template-columns:3.8rem 1fr auto;gap:.75rem;align-items:center;padding:.65rem 1.25rem}
+.pl{display:grid;grid-template-columns:3.8rem 40px 1fr auto;gap:.75rem;align-items:center;padding:.65rem 1.25rem}
 .clock{font:700 1.15rem var(--d);color:var(--muted)}.who small{display:block;color:var(--muted)}
 .tag{font:700 .8rem var(--d);border:1px solid var(--line);padding:0 .35rem;margin-left:.4rem;color:var(--muted)}
 .play{border:2px solid var(--ink);background:none;color:var(--ink);font:700 1rem var(--d);letter-spacing:.04em;padding:.25rem .85rem;border-radius:999px;cursor:pointer}
@@ -84,6 +84,28 @@ dialog::backdrop{background:rgba(0,0,0,.8)}
 .big{display:inline-block;background:var(--goal);color:#fff;font:700 1.1rem var(--d);letter-spacing:.04em;padding:.5rem 1.1rem;border-radius:999px;text-decoration:none;border:0;cursor:pointer}
 .big:hover{filter:brightness(1.15)}
 .ghost{background:none;border:1px solid var(--line);color:var(--muted);font:600 .85rem var(--b);padding:.3rem .8rem;border-radius:999px;cursor:pointer;margin-left:.4rem}
+:root{--glow:rgba(228,38,44,.16)}
+body{background:radial-gradient(1100px 480px at 8% -8%,var(--glow),transparent 60%),radial-gradient(900px 480px at 100% 0,rgba(70,120,255,.10),transparent 55%),var(--bg);background-attachment:fixed}
+.top{position:sticky;top:0;z-index:5;box-shadow:0 10px 30px rgba(0,0,0,.55);background:rgba(0,0,0,.92);backdrop-filter:blur(6px)}
+.bar h1{display:flex;align-items:center;gap:.4rem;font-weight:800;letter-spacing:.06em}
+.bar h1 em{font-style:normal;color:var(--goal)}
+.mk{display:inline-grid;place-items:center;width:1.5rem;height:1.5rem;background:var(--goal);color:#fff;font-size:.8rem;transform:skew(-10deg);margin-right:.2rem}
+.lp{font:700 .85rem var(--d);letter-spacing:.08em;color:#fff;background:var(--live);border-radius:999px;padding:.1rem .7rem;margin:0 0 .6rem;animation:p 1.6s infinite}
+.game{border-left:4px solid color-mix(in srgb,var(--tc,#e4262c) 65%,#fff 35%);background:linear-gradient(100deg,color-mix(in srgb,var(--tc,#e4262c) 20%,var(--paper)),var(--paper) 48%);animation:up .45s both;animation-delay:calc(var(--i,0)*45ms)}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.tile{transition:transform .15s,border-color .15s}.tile:hover{transform:translateY(-2px);border-color:var(--ink)}
+.tile.flash{animation:flash 1.4s ease-out 4;background:#2a1214}
+@keyframes flash{0%{box-shadow:0 0 0 0 rgba(255,59,48,.85)}100%{box-shadow:0 0 0 16px rgba(255,59,48,0)}}
+.num{font-size:3rem}
+.tot b{background:linear-gradient(180deg,#fff,#8e8e99);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tag.tdt{color:#7cffb2;border-color:#1f6b45}.tag.fgt{color:#ffd166;border-color:#7a5c14}
+.hs{overflow:hidden;position:relative}.hs img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
+.hs.sm{width:40px;height:40px;font-size:.85rem}.hs.lg{width:76px;height:76px;font-size:1.4rem}
+.hs.lg+.hs.lg{margin-left:-1.6rem}
+.finds-row{padding:.2rem 0 .3rem}.finds{color:var(--muted);font-size:.9rem}.finds a{margin-left:.7rem;font-weight:600}
+.after{display:block;color:var(--ink);font:700 .95rem var(--d);margin-top:.25rem;letter-spacing:.03em}
+.foot{max-width:1000px;margin:0 auto;padding:0 1.25rem 2.5rem;color:var(--muted);font-size:.78rem}
+@media (prefers-reduced-motion:reduce){.game,.tile.flash,.lp{animation:none}.tile{transition:none}}
 .tools{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-bottom:1rem}
 .tools input{font:500 1rem var(--b);padding:.45rem .7rem;background:var(--paper2);color:var(--ink);border:1px solid var(--line);border-radius:6px;min-width:11rem}
 .pill{font:700 1rem var(--d);letter-spacing:.04em;background:var(--paper2);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:.3rem .95rem;cursor:pointer}
@@ -108,15 +130,16 @@ dialog::backdrop{background:rgba(0,0,0,.8)}
 .st-t td.t .logo{width:1.5rem;height:1.5rem}
 .st-t td.p{font-weight:800}
 .st-t tr:last-child td{border-bottom:0}
-@media (max-width:520px){.pl{grid-template-columns:3rem 1fr}.pl .play{grid-column:2;justify-self:start}}
+@media (max-width:520px){.pl{grid-template-columns:3rem 40px 1fr}.pl .play{grid-column:2/-1;justify-self:start}.num{font-size:2.4rem}}
 </style>
 </head>
 <body>
 <header class="top">
-  <div class="bar"><h1>Scoreboard</h1>
-    <nav id="tabs"><button data-tab="scores">Scores</button><button data-tab="NHL">NHL</button><button data-tab="NFL">NFL</button><button data-tab="standings">Standings</button></nav></div>
+  <div class="bar"><h1><span class="mk">▲</span>SCORE<em>BOARD</em></h1><span id="livepill" class="lp" hidden></span>
+    <nav id="tabs"><button data-tab="scores">⚡ Scores</button><button data-tab="NHL">🏒 NHL</button><button data-tab="NFL">🏈 NFL</button><button data-tab="standings">🏆 Standings</button></nav></div>
 </header>
 <main class="wrap" id="view"></main>
+<footer class="foot" id="foot"></footer>
 
 <dialog id="game" aria-label="Game details">
   <div class="dtop"><span id="dstamp"></span><button class="close" id="closeGame">Close</button></div>
@@ -140,6 +163,14 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const ytSearch = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
 const fmtDay = x => new Date(x + "T12:00:00").toLocaleDateString(undefined, {weekday:"short", month:"short", day:"numeric"});
+const RELAYS = [u => u, u => "https://corsproxy.io/?url=" + encodeURIComponent(u), u => "https://api.allorigins.win/raw?url=" + encodeURIComponent(u), u => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(u)];
+let relayIx = 0; const FEED = {nhl:"not tried", nfl:"not tried", stand:"saved copy", espnHockey:"not used"};
+async function nhlGet(path){  /* the NHL feed, directly if the browser is allowed, otherwise through a public relay */
+  const url = NHL_API + path; let err;
+  for (let k = 0; k < RELAYS.length; k++) { const i = (relayIx + k) % RELAYS.length;
+    try { const r = await getJ(RELAYS[i](url)); relayIx = i; FEED.nhl = ["direct", "relay 1", "relay 2", "relay 3"][i]; return r; } catch (e) { err = e; } }
+  throw err;
+}
 const getJ = async u => { const r = await fetch(u); if (!r.ok) throw new Error(r.status); return r.json(); };
 
 /* ---------- saved games (data.js, written every night by fetch_goals.py) ---------- */
@@ -153,6 +184,7 @@ Object.keys(RAW).sort().forEach(d => (RAW[d] || []).forEach(g => {
   if (k) seen.add(k);
   SAVED.push(Object.assign({date: d}, g));
 }));
+SAVED.forEach(g => g.plays.forEach(p => { const t = p.team === "away" ? g.away : g.home; p.sport = g.sport; p.ab = t.ab || t.n; }));
 const LATEST_DATE = SAVED.length ? SAVED.map(g => g.date).sort().pop() : null;
 const savedDates = lg => [...new Set(SAVED.filter(g => !lg || g.sport === lg).map(g => g.date))].sort().reverse();
 const nflWeeks = () => { const m = new Map(); SAVED.filter(g => g.sport === "NFL").forEach(g => { const k = g.wkn || 0; if (!m.has(k)) m.set(k, {k, label: g.wk || "Games"}); }); return [...m.values()].sort((a, b) => b.k - a.k); };
@@ -177,7 +209,7 @@ const stTeam = t => ({ab:(t.teamAbbrev || {}).default, name:(t.teamName || {}).d
   gp:t.gamesPlayed, w:t.wins, l:t.losses, otl:t.otLosses, pts:t.points, pp:t.pointPctg, row:t.regulationPlusOtWins, gf:t.goalFor, ga:t.goalAgainst, diff:t.goalDifferential,
   strk:(t.streakCode || "") + (t.streakCount || ""), l10:`${t.l10Wins || 0}-${t.l10Losses || 0}-${t.l10OtLosses || 0}`});
 async function loadStandings(){
-  try { const r = await getJ(NHL_API + "/standings/now"); const teams = r.standings.map(stTeam);
+  try { const r = await nhlGet("/standings/now"); const teams = r.standings.map(stTeam);
     if (teams.length) { STAND = {date:(r.standings[0] || {}).date, teams}; standLive = true; if (tab === "standings") render(); } } catch (e) {}
 }
 const standRec = ab => { const t = STAND && STAND.teams.find(x => x.ab === ab); return t ? `${t.w}-${t.l}-${t.otl}` : ""; };
@@ -185,7 +217,7 @@ const nhlRec = ab => standRec(ab) || fmtRec("NHL", TALLY["NHL" + ab]);
 
 let tab = "scores", SCORES = [], VIEW = [], nhlSkipUntil = 0;
 try { const t = localStorage.getItem("sb_tab"); if (["scores", "NHL", "NFL", "standings"].includes(t)) tab = t; } catch (e) {}
-const feeds = {nhl:"", nfl:""};
+const feeds = {nhl:"", nfl:""}, FLASH = {};
 const S = {scores:"live", NHL:null, NFL:null, stand:"NHL", f:"", kind:"all"};
 try { const t = localStorage.getItem("sb_stand"); if (t === "NHL" || t === "NFL") S.stand = t; } catch (e) {}
 
@@ -210,7 +242,7 @@ const espnS = (league, ev) => { const c = ev.competitions[0].competitors, t = ev
   return {league, key:(league === "NHL" ? "NHLE:" : "NFL:") + ev.id, away:f("away"), home:f("home"), state:{in:"live", post:"final"}[t.state] || "pre", detail:t.shortDetail}; };
 async function nhlLive(){
   /* the NHL's own feed first (it has goal clips); if the browser can't reach it, use ESPN's hockey scoreboard */
-  if (Date.now() >= nhlSkipUntil) { try { const r = await getJ(NHL_API + "/score/now"); return {src:"nhl", list:r.games.map(nhlS)}; } catch (e) { nhlSkipUntil = Date.now() + 600000; } }
+  if (Date.now() >= nhlSkipUntil) { try { const r = await nhlGet("/score/now"); return {src:"nhl", list:r.games.map(nhlS)}; } catch (e) { nhlSkipUntil = Date.now() + 120000; FEED.nhl = "blocked"; } }
   const r = await getJ(ESPN_NHL + "/scoreboard"); return {src:"espn", list:r.events.map(ev => espnS("NHL", ev))};
 }
 async function loadLive(){
@@ -219,15 +251,26 @@ async function loadLive(){
   feeds.nhl = a.status === "fulfilled" ? a.value.src : "fail"; feeds.nfl = "fail";
   try { if (a.status === "fulfilled") out.push(...a.value.list); } catch (e) { feeds.nhl = "fail"; }
   try { if (b.status === "fulfilled") { out.push(...b.value.events.map(ev => espnS("NFL", ev))); feeds.nfl = "ok"; } } catch (e) {}
+  FEED.espnHockey = a.status === "fulfilled" && a.value.src === "espn" ? "used" : "not used";
+  FEED.nfl = feeds.nfl === "ok" ? "ok" : "unreachable";
+  if (a.status !== "fulfilled") FEED.nhl = "unreachable"; else if (a.value.src === "espn") FEED.nhl = "blocked in this browser";
   const next = out.length ? out : fallbackScores();
+  const prev = Object.fromEntries(SCORES.map(g => [g.key, g.away.s + "-" + g.home.s]));
+  next.forEach(g => { if (g.key && g.state === "live" && prev[g.key] !== undefined && prev[g.key] !== g.away.s + "-" + g.home.s) FLASH[g.key] = Date.now(); });
+  paintFoot();
   if (JSON.stringify(next) !== JSON.stringify(SCORES)) { SCORES = next; if (tab === "scores" && S.scores === "live") render(); else refreshStrip(); }
 }
 
 /* ---------- Scores tab ---------- */
 const sd = (t, g, other) => { const lose = g.state === "final" && +t.s < +other.s;
   return `<div class="sd ${lose ? "l" : ""}">${mark(t)}<b>${esc(t.ab)}${t.rec ? `<span class="rec">${esc(t.rec)}</span>` : ""}</b><span>${g.state === "pre" ? "" : esc(t.s == null ? "" : t.s)}</span></div>`; };
+function paintFoot(){
+  const el = $("foot"), live = SCORES.filter(g => g.state === "live").length, lp = $("livepill");
+  if (lp) { lp.hidden = !live; lp.textContent = "● " + live + " LIVE"; }
+  if (el) el.innerHTML = `<b>Status</b> · Saved games: ${SAVED.length}${LATEST_DATE ? " (latest " + esc(fmtDay(LATEST_DATE)) + ")" : ""} · NHL live feed: ${esc(FEED.nhl)}${FEED.espnHockey === "used" ? " (showing ESPN scores only, no goal details)" : ""} · NFL live feed: ${esc(FEED.nfl)} · NHL standings: ${standLive ? "live" : "saved copy"}`;
+}
 const tile = g => { const inner = `<div class="meta"><span>${g.league}</span><span>${g.state === "live" ? '<i class="dot"></i>' : ""}${esc(g.detail)}</span></div>${sd(g.away, g, g.home)}${sd(g.home, g, g.away)}`;
-  return g.key ? `<button type="button" class="tile ${g.state}" data-open="${esc(g.key)}">${inner}</button>` : `<div class="tile ${g.state}">${inner}</div>`; };
+  return g.key ? `<button type="button" class="tile ${g.state}${FLASH[g.key] && Date.now() - FLASH[g.key] < 9000 ? " flash" : ""}" data-open="${esc(g.key)}">${inner}</button>` : `<div class="tile ${g.state}">${inner}</div>`; };
 const noData = `<p class="note">No saved games yet. In GitHub, open <b>Actions</b>, choose <b>Update goals nightly</b> and click <b>Run workflow</b> to load the season.</p>`;
 const feedWarn = () => { const w = [];
   if (feeds.nhl === "fail") w.push("hockey"); if (feeds.nfl === "fail") w.push("football");
@@ -282,7 +325,7 @@ function leagueView(lg){
     const rows = g.plays.map((p, pi) => playRow(p, (p.team === "away" ? g.away : g.home).n, `data-g="${gi}" data-p="${pi}"`)).join("");
     const rc = r => r ? `<span class="rec">${esc(r)}</span>` : "";
     const tags = [g.away.n, g.away.ab, g.home.n, g.home.ab].join(" ").toLowerCase();
-    return `<article class="game" data-t="${esc(tags)}"><div class="sc"><div class="tm ${aw ? "" : "lose"}">${mark(g.away, "logo")}${esc(g.away.n)}${rc(g.recA)}</div><div class="num ${aw ? "" : "lose"}">${g.away.s}</div>
+    return `<article class="game" data-t="${esc(tags)}" style="--tc:${esc(((aw ? g.away : g.home).c) || "#e4262c")};--i:${Math.min(gi, 12)}"><div class="sc"><div class="tm ${aw ? "" : "lose"}">${mark(g.away, "logo")}${esc(g.away.n)}${rc(g.recA)}</div><div class="num ${aw ? "" : "lose"}">${g.away.s}</div>
       <div class="tm ${aw ? "lose" : ""}">${mark(g.home, "logo")}${esc(g.home.n)}${rc(g.recH)}</div><div class="num ${aw ? "lose" : ""}">${g.home.s}</div></div>
       <div class="st"><span>${lg === "NFL" ? fmtDay(g.date) + " · " : ""}${g.pre ? "Preseason · " : ""}${esc(g.status)}</span>${g.id ? `<button class="link" data-open="${g.sport}:${esc(g.id)}">Game page · stats · video</button>` : ""}</div>
       <div class="strip" aria-hidden="true">${dots}</div><ul class="plays">${rows}</ul></article>`; }).join("");
@@ -300,26 +343,60 @@ function openWeeks(){
     groups[g].sort((a, b) => a.k - b.k).map(w => `<button type="button" data-wk="${w.k}" ${String(w.k) === cur ? 'aria-current="true"' : ""}><b>${esc(w.label)}</b><small>${w.games} games · ${w.tds} TD<br>${shortDay(w.from)}${w.to !== w.from ? " – " + shortDay(w.to) : ""}</small></button>`).join("") + `</div>`).join("") || `<p class="note" style="padding:1rem 1.25rem">No weeks saved yet.</p>`;
   $("weeks").showModal();
 }
-const playRow = (p, teamName, attrs) => `<li data-kind="${esc(p.kind)}"><div class="pl"><span class="clock">${esc(p.clock)}</span>
-  <span class="who"><b>${esc(p.who)}</b> · ${esc(teamName)}${p.kind === "fg" ? '<span class="tag">FG</span>' : ""}<small>${esc(p.type)} – ${esc(p.assist)}</small></span>
-  <button class="play" ${attrs}>▶ Watch</button></div><div class="clip" hidden></div></li>`;
 const ini = n => String(n || "?").split(/\s+/).map(x => x[0]).slice(0, 2).join("").toUpperCase();
-const face = (src, name) => src ? `<img class="hs" src="${esc(src)}" alt="${esc(name)}" onerror="this.outerHTML='<span class=&quot;hs&quot;>${esc(ini(name))}</span>'">` : `<span class="hs" aria-hidden="true">${esc(ini(name))}</span>`;
+/* a headshot circle: starts as initials, then fills in from the saved link or, failing that, the team's ESPN roster */
+const face = (src, name, p, size) => `<span class="hs ${size || ""}" data-hs="${esc((p && p.sport) || "")}|${esc((p && p.ab) || "")}|${esc(name)}" data-src="${esc(src || "")}" aria-hidden="true">${esc(ini(name))}</span>`;
+const playRow = (p, teamName, attrs) => `<li data-kind="${esc(p.kind)}"><div class="pl"><span class="clock">${esc(p.clock)}</span>${face(p.img, p.who, p, "sm")}
+  <span class="who"><b>${esc(p.who)}</b> · ${esc(teamName)}${p.kind === "fg" ? '<span class="tag fgt">FG</span>' : p.kind === "td" ? '<span class="tag tdt">TD</span>' : ""}${/power|short|empty|penalty/i.test(p.type) ? `<span class="tag">${esc(p.type.replace(" goal", ""))}</span>` : ""}<small>${esc(p.type)} – ${esc(p.assist)}</small></span>
+  <button class="play" ${attrs}>▶ ${p.embed && !isYT(p.embed) ? "Watch" : "Play card"}</button></div><div class="clip" hidden></div></li>`;
 const isYT = e => e && /youtube\.com\/embed/.test(e.src || "");
+const findLinks = p => { const q = encodeURIComponent(`${p.who} ${p.kind === "fg" ? "field goal" : p.kind === "td" ? "touchdown" : "goal"} ${p.ab || ""} ${p.type || ""}`.trim());
+  return `<span class="finds">Find the clip: <a href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">YouTube</a><a href="https://x.com/search?q=${q}&f=video" target="_blank" rel="noopener">X</a><a href="https://www.reddit.com/search/?q=${q}" target="_blank" rel="noopener">Reddit</a></span>`; };
 const embed = p => { const e = p.embed;
-  /* player card: headshot + what happened + a button for the video */
-  const faces = face(p.img, p.who) + (p.img2 ? face(p.img2, "") : "");
-  const link = p.url ? `<a class="big" href="${esc(p.url)}" target="_blank" rel="noopener">${isYT(e) ? "↗ Open on YouTube" : p.exact ? "↗ Open the clip" : "🔍 Search for the clip"}</a>` : "";
-  const card = `<div class="pcard">${faces}<div class="tx"><b>${esc(p.who)}</b><small>${esc(p.type)} – ${esc(p.assist)}</small>${p.ofGame ? `<small style="display:block">Game highlights video (exact play not found)</small>` : ""}</div>${link}</div>`;
-  if (!e) return card + (!e && !p.url ? `<div class="noclip">No clip for this play yet.</div>` : "");
+  const pm = String(p.assist || "").match(/from (.+)$/), pass = pm ? pm[1].replace(/\s*\(.*$/, "").trim() : "";
+  const faces = face(p.img, p.who, p, "lg") + (p.img2 || pass ? face(p.img2, pass, p, "lg") : "");
+  const hasVideo = e && !isYT(e);
+  const link = p.exact && p.url ? `<a class="big" href="${esc(p.url)}" target="_blank" rel="noopener">↗ Open the clip</a>` : "";
+  const card = `<div class="pcard">${faces}<div class="tx"><b>${esc(p.who)}</b><small>${esc(p.type)} – ${esc(p.assist)}</small>${p.sc ? `<span class="after">${esc(p.clock)} · ${esc(p.sc)}</span>` : `<span class="after">${esc(p.clock)}</span>`}</div>${link}</div>`;
+  if (!e) return card + `<div class="finds-row">${findLinks(p)}</div>`;
   const m = e.kind === "video" ? `<video src="${esc(e.src)}" controls autoplay playsinline></video>`
-    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">${isYT(e) ? "If it says the video is unavailable, the owner blocked embedding. " : "If the video box stays blank, "}use the button above.</p>`;
-  return card + m; };
+    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">If the video box stays blank, use the button above.</p>`;
+  return card + m + (hasVideo ? "" : `<div class="finds-row">${findLinks(p)}</div>`); };
+function fillHeads(root){
+  (root || document).querySelectorAll(".hs[data-hs]").forEach(el => {
+    if (el.dataset.done) return; el.dataset.done = "1";
+    const [sport, ab, name] = el.dataset.hs.split("|"); let tried2 = false;
+    const put = src => { if (!src) return false; const im = new Image(); im.alt = name;
+      im.onload = () => { el.textContent = ""; el.appendChild(im); };
+      im.onerror = async () => { if (!tried2) { tried2 = true; const s2 = await findHead(sport, ab, name).catch(() => null); if (s2 && s2 !== src) put(s2); } };
+      im.src = src; return true; };
+    if (!put(el.dataset.src)) findHead(sport, ab, name).then(put).catch(() => {});
+  });
+}
+const ROSTERS = {}, NHL_ESPN = {NJD:"NJ", TBL:"TB", LAK:"LA", SJS:"SJ", UTA:"UTAH"};
+const normN = x => String(x || "").toLowerCase().replace(/[.'’]/g, "").replace(/\b(jr|sr|ii|iii|iv)\b/g, "").replace(/\s+/g, " ").trim();
+function roster(sport, ab){
+  const k = sport + ab; if (ROSTERS[k]) return ROSTERS[k];
+  const base = sport === "NHL" ? ESPN_NHL : ESPN_NFL, code = String(sport === "NHL" ? (NHL_ESPN[ab] || ab) : ab).toLowerCase();
+  return ROSTERS[k] = getJ(`${base}/teams/${code}/roster`).then(r => { const out = [];
+    (function w(o){ if (Array.isArray(o)) o.forEach(w); else if (o && typeof o === "object") {
+      if (o.id && (o.displayName || o.fullName)) out.push({n:o.displayName || o.fullName, first:o.firstName || "", last:o.lastName || "", img:(o.headshot && o.headshot.href) || `https://a.espncdn.com/i/headshots/${sport.toLowerCase()}/players/full/${o.id}.png`});
+      Object.values(o).forEach(w); } })(r.athletes || []); return out; }).catch(() => []);
+}
+async function findHead(sport, ab, name){
+  if (!sport || !ab || !name) return null;
+  const R = await roster(sport, ab), n = normN(name); if (!R.length) return null;
+  let m = R.find(x => normN(x.n) === n); if (m) return m.img;
+  const parts = n.split(" "), last = parts[parts.length - 1], ini1 = (parts[0] || "")[0];
+  const byLast = R.filter(x => normN(x.last) === last || normN(x.n).endsWith(" " + last));
+  m = byLast.find(x => normN(x.first)[0] === ini1) || (byLast.length === 1 ? byLast[0] : null);
+  return m ? m.img : null;
+}
 function toggleClip(btn, play, scope){
   const box = btn.closest("li").querySelector(".clip"), was = !box.hidden;
   scope.querySelectorAll(".clip").forEach(c => { c.hidden = true; c.innerHTML = ""; });
   if (was) return false;
-  box.innerHTML = embed(play); box.hidden = false; return true;
+  box.innerHTML = embed(play); box.hidden = false; fillHeads(box); return true;
 }
 
 /* ---------- Standings tab ---------- */
@@ -361,9 +438,10 @@ const goalType = (d, e, homeId) => { if (d.goalModifier === "empty-net") return 
 const NHL_STATS = {sog:"Shots on goal", faceoffWinningPctg:"Faceoff win %", powerPlay:"Power play", pim:"Penalty minutes", hits:"Hits", blockedShots:"Blocked shots", giveaways:"Giveaways", takeaways:"Takeaways"};
 const NFL_STATS = [["firstDowns","1st downs"],["totalYards","Total yards"],["netPassingYards","Passing yards"],["rushingYards","Rushing yards"],["thirdDownEff","3rd down"],["fourthDownEff","4th down"],["turnovers","Turnovers"],["totalPenaltiesYards","Penalties-yards"],["possessionTime","Possession"],["sacksYardsLost","Sacked-yards"],["yardsPerPlay","Yards per play"],["redZoneAttempts","Red zone"]];
 const vidId = v => { const m = String(v == null ? "" : typeof v === "object" ? (v.id || v.videoId || "") : v).match(/(\d{8,})/); return m ? m[1] : null; };
+const mug = (p, pid, team) => { const y = String(p.id || "").slice(0, 4); return pid && team && /^\d{4}$/.test(y) ? `https://assets.nhle.com/mugs/nhl/${y}${+y + 1}/${team.abbrev}/${pid}.png` : null; };
 async function detNHL(id){
-  const [p, rr] = await Promise.all([getJ(`${NHL_API}/gamecenter/${id}/play-by-play`), getJ(`${NHL_API}/gamecenter/${id}/right-rail`).catch(() => null)]);
-  const nm = {}, hd = {}; (p.rosterSpots || []).forEach(r => hd[r.playerId] = r.headshot, nm[r.playerId] = ((r.firstName || {}).default || "").slice(0, 1) + ". " + ((r.lastName || {}).default || ""));
+  const [p, rr] = await Promise.all([nhlGet(`/gamecenter/${id}/play-by-play`), nhlGet(`/gamecenter/${id}/right-rail`).catch(() => null)]);
+  const nm = {}, hd = {}; (p.rosterSpots || []).forEach(r => { hd[r.playerId] = r.headshot; nm[r.playerId] = ((r.firstName || {}).default || "").slice(0, 1) + ". " + ((r.lastName || {}).default || ""); });
   const A = p.awayTeam, H = p.homeTeam, st = {LIVE:"live", CRIT:"live", FINAL:"final", OFF:"final"}[p.gameState] || "pre";
   const lastT = (p.gameOutcome || {}).lastPeriodType || (p.periodDescriptor || {}).periodType, ck = p.clock || {};
   const detail = st === "live" ? per(p.periodDescriptor) + " " + (ck.inIntermission ? "intermission" : String(ck.timeRemaining || "").replace(/^0/, ""))
@@ -373,7 +451,7 @@ async function detNHL(id){
     const d = e.details || {}, pd = e.periodDescriptor || {}, n = pd.number || 1, who = nm[d.scoringPlayerId] || "Own goal";
     const as = [d.assist1PlayerId, d.assist2PlayerId].filter(Boolean).map(i => nm[i]).filter(Boolean), cid = d.highlightClip || vidId(d.highlightClipSharingUrl);
     return {clock: (pd.periodType === "OT" ? "OT" : per(pd)) + " " + String(e.timeInPeriod || "0:00").replace(/^0/, ""), per:n, team: d.eventOwnerTeamId === H.id ? "home" : "away",
-      who, img: hd[d.scoringPlayerId], assist: as.join(", ") || "unassisted", type: goalType(d, e, H.id), kind:"goal", embed: cid ? {kind:"iframe", src: BC + cid} : null,
+      who, img: hd[d.scoringPlayerId] || mug(p, d.scoringPlayerId, d.eventOwnerTeamId === H.id ? H : A), sc: d.awayScore != null ? `${A.abbrev} ${d.awayScore} – ${H.abbrev} ${d.homeScore}` : "", assist: as.join(", ") || "unassisted", type: goalType(d, e, H.id), kind:"goal", embed: cid ? {kind:"iframe", src: BC + cid} : null,
       url: d.highlightClipSharingUrl || ytSearch(`${who} goal ${A.abbrev || ""} ${H.abbrev || ""}`), exact: !!d.highlightClipSharingUrl}; });
   let line = null;
   if (st !== "pre") { const cols = Math.max(3, ...plays.map(x => x.per)); line = {cols:[], away:[], home:[]};
@@ -403,8 +481,9 @@ async function detESPN(path, league, id){
       return {clock: (p > 3 ? "OT" : ["", "1st", "2nd", "3rd"][p]) + " " + clk, per:p, team:side, who, assist: txt.slice(who.length).trim() || tt, type: tt || "Goal", kind:"goal", embed:null,
         url: ytSearch(`${who} goal ${away.team.abbreviation} ${home.team.abbreviation} NHL highlights`), exact:false}; }
     const td = low.includes("touchdown"), fg = low.includes("field goal"), [who, as] = splitTd(txt, tt), [href, mp4] = nflVideo(videos, who, used);
+    const sc = sp.awayScore != null ? `${away.team.abbreviation} ${sp.awayScore} – ${home.team.abbreviation} ${sp.homeScore}` : "";
     const pm = txt.match(/\bfrom ([A-Z][\w.'\- ]+?)(?: \(|$)/), im = n => n && heads[n.toLowerCase()];
-    return {clock: (p <= 4 ? "Q" + p : "OT") + " " + clk, per:p, team:side, who, img: im(who), img2: pm && im(pm[1].trim()), assist: fg ? as.replace("field Goal", "field goal") : as, type: fg ? "Field goal" : td ? tt.replace(" Touchdown", " TD") : tt, kind: fg ? "fg" : td ? "td" : "other",
+    return {clock: (p <= 4 ? "Q" + p : "OT") + " " + clk, per:p, team:side, who, sc, img: im(who), img2: pm && im(pm[1].trim()), assist: fg ? as.replace("field Goal", "field goal") : as, type: fg ? "Field goal" : td ? tt.replace(" Touchdown", " TD") : tt, kind: fg ? "fg" : td ? "td" : "other",
       embed: mp4 ? {kind:"video", src:mp4} : null, url: href || ytSearch(`${who} ${fg ? "field goal" : "touchdown"} ${away.team.abbreviation} ${home.team.abbreviation} NFL highlights`), exact: !!href}; });
   const ls = c => (c.linescores || []).map(x => x.displayValue != null ? x.displayValue : x.value), la = ls(away), lh = ls(home), n = Math.max(la.length, lh.length);
   const line = n && st !== "pre" ? {cols: Array.from({length:n}, (_, i) => hockey ? (i < 3 ? String(i + 1) : "OT") : (i < 4 ? "Q" + (i + 1) : "OT")), away:la, home:lh} : null;
@@ -442,7 +521,7 @@ async function pollGame(){
   clearTimeout(det.timer);
   const key = det.key; if (!key) return;
   const i = key.indexOf(":"), kind = key.slice(0, i), id = key.slice(i + 1);
-  try { const d = await (kind === "NHL" ? detNHL(id) : kind === "NHLE" ? detESPN("hockey/nhl", "NHL", id) : detESPN("football/nfl", "NFL", id)); if (det.key !== key) return; if (kind === "NFL") { try { mergeSaved(d, "NFL", id); } catch (e) {} } det.data = d; paintGame(); }
+  try { const d = await (kind === "NHL" ? detNHL(id) : kind === "NHLE" ? detESPN("hockey/nhl", "NHL", id) : detESPN("football/nfl", "NFL", id)); if (det.key !== key) return; d.plays.forEach(p => { p.sport = d.league; p.ab = (p.team === "away" ? d.away : d.home).ab; }); if (kind === "NFL") { try { mergeSaved(d, "NFL", id); } catch (e) {} } det.data = d; paintGame(); }
   catch (e) { if (det.key !== key) return; if (!det.data) { det.data = savedDetail(kind === "NHLE" ? "NHL" : kind, id); if (det.data) paintGame(); else $("dhead").innerHTML = `<p class="note" style="padding:1rem 1.25rem">This game can't be loaded right now.</p>`; } }
   const st = det.data && det.data.state;  /* finished games are loaded once; live games refresh every 15s */
   if (det.key === key && (st === "live" || st === "pre")) det.timer = setTimeout(pollGame, st === "live" ? 15000 : 60000);
@@ -466,6 +545,7 @@ function paintGame(){
       : `<li><div class="pl" style="display:block"><span class="note">${esc(d.note || (d.state === "pre" ? "No scoring yet." : "No scoring plays yet."))}</span></div></li>`;
     if (det.open != null && d.plays[det.open]) { const b = $("dplays").querySelector(`[data-dp="${det.open}"]`); if (b) toggleClip(b, d.plays[det.open], $("dplays")); }
   }
+  fillHeads($("dplays"));
   $("dstamp").textContent = d.state === "live" ? "Updating every 15 seconds · " + new Date().toLocaleTimeString() : d.offline ? "" : "Updated " + new Date().toLocaleTimeString();
 }
 function closeGame(){ clearTimeout(det.timer); det.key = null; det.data = null; $("dplays").innerHTML = ""; $("dvids").innerHTML = ""; if ($("game").open) $("game").close(); }
@@ -475,6 +555,7 @@ function render(){
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.tab === tab));
   $("view").innerHTML = tab === "scores" ? scoresView() : tab === "standings" ? standingsView() : leagueView(tab);
   if (tab === "NHL" || tab === "NFL") applyFilters();
+  fillHeads($("view")); paintFoot();
 }
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.tab; try { localStorage.setItem("sb_tab", tab); } catch (e) {} render(); window.scrollTo && window.scrollTo(0, 0); }));
 $("view").addEventListener("change", e => {
