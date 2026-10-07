@@ -142,6 +142,66 @@ def yt_pick(query, must, avoid=()):
     return None
 
 
+# ------------------------------------------------------------------ Highlightly (NFL clips that can be embedded)
+# A free key from highlightly.net (100 lookups a day) lets us fetch touchdown and field goal clips that are made to be
+# embedded on other sites. Put the key in a GitHub secret called HIGHLIGHTLY_KEY. Without a key this part is skipped.
+HL_KEY = os.environ.get("HIGHLIGHTLY_KEY", "").strip()
+HL_BUDGET = [90]
+
+
+def hl_fetch(date, away_dn, home_dn):
+    """All highlights Highlightly has for one game (tries the game date and the next day, since night games cross midnight UTC)."""
+    if not HL_KEY or not away_dn or not home_dn:
+        return None
+    nxt = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    for d in (date, nxt):
+        if HL_BUDGET[0] <= 0:
+            return None
+        HL_BUDGET[0] -= 1
+        q = urllib.parse.urlencode({"date": d, "timezone": "America/Toronto", "homeTeamDisplayName": home_dn,
+                                    "awayTeamDisplayName": away_dn, "limit": 100})
+        req = urllib.request.Request("https://american-football.highlightly.net/highlights?" + q,
+                                     headers={"x-rapidapi-key": HL_KEY, "User-Agent": "goal-site/0.3"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.load(resp)
+        except Exception as err:
+            print(f"    Highlightly lookup failed: {err}")
+            return None
+        items = data.get("data") if isinstance(data, dict) else data
+        items = [h for h in (items or []) if isinstance(h, dict) and (h.get("embedUrl") or h.get("url"))]
+        if items:
+            return items
+    return []
+
+
+def hl_playable(h):
+    """Skip clips the NFL's own YouTube channel owns: it blocks every other website from showing them."""
+    emb = (h.get("embedUrl") or "")
+    return bool(emb) and not ("youtube" in emb and "nfl" in str(h.get("channel", "")).lower())
+
+
+def hl_match(items, who, kind, assist, used):
+    last = who.split()[-1].lower() if who.split() else ""
+    yds = (re.search(r"(\d+)-yd", assist) or [None, None])[1]
+    best, best_score = None, 0
+    for i, h in enumerate(items):
+        if i in used or not hl_playable(h) or len(last) < 3:
+            continue
+        t = (str(h.get("title", "")) + " " + str(h.get("description") or "")).lower()
+        cat = str(h.get("category", "")).lower()
+        if last not in t:
+            continue
+        is_fg = "field" in cat or "field goal" in t
+        is_td = "touchdown" in cat or "touchdown" in t or re.search(r"\btd\b", t)
+        if (kind == "fg" and not is_fg) or (kind != "fg" and not is_td):
+            continue
+        score = 1 + (3 if yds and re.search(rf"\b{yds}[- ]?(yd|yard)", t) else 0) + (1 if "youtube" not in (h.get("embedUrl") or "") else 0)
+        if score > best_score:
+            best, best_score = i, score
+    return best
+
+
 def city_name(place, common):
     """'New York' + 'Giants' -> 'NY Giants' so the two NY/LA teams are distinct."""
     short = {"New York": "NY", "Los Angeles": "LA"}
@@ -375,7 +435,7 @@ def nfl_team(c):
     logo = t.get("logo")
     return {
         "id": t.get("id"), "n": city_name(t.get("location", ""), t.get("name", "")) or t.get("displayName", ""),
-        "ab": t.get("abbreviation", ""), "nick": t.get("name", ""),
+        "ab": t.get("abbreviation", ""), "nick": t.get("name", ""), "dn": t.get("displayName", ""),
         "c": "#" + (t.get("color") or "7A8793"), "s": int(c.get("score") or 0),
         "logo": logo, "logoDark": logo.replace("/500/", "/500-dark/") if logo else None,
     }
@@ -468,6 +528,15 @@ def parse_nfl_game(ev, date, prev=None):
     used = set()
 
     # the game's own highlight video, and whether this game is recent enough to look for every play separately
+    prev = prev or {}
+    items = None
+    try:
+        recent_hl = (datetime.now() - datetime.strptime(date, "%Y-%m-%d")).days <= 2
+    except Exception:
+        recent_hl = True
+    if HL_KEY and (recent_hl or not prev.get("hlt")):
+        items = hl_fetch(date, away.get("dn"), home.get("dn"))
+    used_hl = set()
     heads = nfl_heads(summary)
     for t in (away, home):  # the full rosters fill in anyone the box score missed (kickers, receivers...)
         for k, v in nfl_roster_heads(t["id"]).items():
@@ -506,6 +575,13 @@ def parse_nfl_game(ev, date, prev=None):
         exact = bool(url)
         embed = {"kind": "video", "src": mp4} if mp4 else None
         of_game = False
+        if not embed and items:
+            hi = hl_match(items, who, "fg" if is_fg else "td", assist, used_hl)
+            if hi is not None:
+                used_hl.add(hi)
+                h = items[hi]
+                embed = {"kind": "iframe", "src": h["embedUrl"]}
+                url, exact = h.get("url") or h["embedUrl"], True
         before = old_plays.get((who, f"{label} {int(mm)}:{ss}"))
         if not embed and before and before.get("embed") and not before.get("ofGame"):
             embed, url, exact = before["embed"], before["url"], True  # found on an earlier run: keep it
@@ -541,6 +617,10 @@ def parse_nfl_game(ev, date, prev=None):
         href, mp4 = video_links(v)
         if (href or mp4) and len(hl) < 3 and (href, mp4) not in [(x["url"], x["src"]) for x in hl]:
             hl.append({"label": v.get("headline") or "Highlights", "src": mp4, "url": href})
+    for h in (items or []):
+        cat = str(h.get("category", "")).lower()
+        if hl_playable(h) and ("match" in cat or "recap" in cat or "game" in cat) and len(hl) < 3:
+            hl.append({"label": h.get("title") or "Game highlights", "emb": h["embedUrl"], "url": h.get("url") or h["embedUrl"], "src": None})
     if game_clip:
         hl.insert(0, {"label": "Game highlights", "yt": game_clip["id"], "url": "https://www.youtube.com/watch?v=" + game_clip["id"], "src": None})
     ls = {}
@@ -553,8 +633,11 @@ def parse_nfl_game(ev, date, prev=None):
     for t in (away, home):
         t.pop("id", None)
         t.pop("nick", None)
+        t.pop("dn", None)
     game = {"sport": "NFL", "id": str(ev["id"]), "date": date, "wk": wk, "wkn": wkn,
             "status": status, "away": away, "home": home, "plays": plays, "stats": stats, "hl": hl}
+    if items:
+        game["hlt"] = True
     if line:
         game["ls"] = line
     return game
