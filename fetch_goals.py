@@ -57,6 +57,7 @@ def search_link(text):
 # ------------------------------------------------------------------ YouTube lookups (NFL clips)
 # ESPN does not list NFL clips, so we look for them on YouTube. With a free YOUTUBE_API_KEY (optional, set it as a
 # GitHub secret) the official search is used; without one we read the normal YouTube search page.
+USE_YOUTUBE = os.environ.get("NFL_CLIPS", "").lower() == "youtube"  # off by default: the NFL blocks its videos from other sites
 YT_BUDGET = [400]  # most lookups per run, so a run can never drag on
 
 
@@ -97,7 +98,7 @@ def _yt_api(query, key):
 
 
 def yt_results(query):
-    if YT_BUDGET[0] <= 0:
+    if not USE_YOUTUBE or YT_BUDGET[0] <= 0:
         return []
     YT_BUDGET[0] -= 1
     key = os.environ.get("YOUTUBE_API_KEY", "").strip()
@@ -170,6 +171,14 @@ def nhl_roster(pbp):
         last = r.get("lastName", {}).get("default", "")
         names[r.get("playerId")] = f"{first[:1]}. {last}".strip()
     return names
+
+
+def mug_url(game_id, player_id, team_ab):
+    """NHL player photos follow a fixed pattern: season / team / player id."""
+    y = str(game_id)[:4]
+    if not (y.isdigit() and player_id and team_ab):
+        return None
+    return f"https://assets.nhle.com/mugs/nhl/{y}{int(y) + 1}/{team_ab}/{player_id}.png"
 
 
 def nhl_heads(pbp):
@@ -321,7 +330,9 @@ def parse_nhl_game(game_id, date, sched=None):
             "t": round(minute_in_game, 1), "clock": f"{label} {int(mm)}:{ss}", "team": side,
             "who": who, "assist": ", ".join(a for a in assists if a) or "unassisted",
             "type": nhl_goal_type(d, home["id"]), "kind": "goal", "embed": embed, "url": url, "exact": exact,
-            **({"img": heads[d.get("scoringPlayerId")]} if heads.get(d.get("scoringPlayerId")) else {}),
+            **({"img": heads.get(d.get("scoringPlayerId")) or mug_url(game_id, d.get("scoringPlayerId"), (home if side == "home" else away)["ab"])}
+               if d.get("scoringPlayerId") else {}),
+            **({"sc": f"{away['ab']} {d['awayScore']} – {home['ab']} {d['homeScore']}"} if d.get("awayScore") is not None else {}),
         })
 
     stats, line = nhl_extras(game_id)
@@ -517,6 +528,7 @@ def parse_nfl_game(ev, date, prev=None):
             "t": round(minute_in_game, 1), "clock": f"{label} {int(mm)}:{ss}", "team": side,
             "who": who, "assist": assist, "type": "Field goal" if is_fg else (ttext.replace(" Touchdown", " TD") or "TD"),
             "kind": "fg" if is_fg else "td", "embed": embed,
+            **({"sc": f"{away['ab']} {sp['awayScore']} – {home['ab']} {sp['homeScore']}"} if sp.get("awayScore") is not None else {}),
             "url": url, "exact": exact, **({"ofGame": True} if of_game else {}),
             **({"img": heads[who.lower()]} if heads.get(who.lower()) else {}),
             **({"img2": heads[passer.lower()]} if passer and heads.get(passer.lower()) else {}),
