@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark">
-<title>Scoreboard</title>
+<title>Scores and Whatnot</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#0d0d0f;--paper:#17171a;--paper2:#202024;--ink:#ededf0;--muted:#9b9ba5;--line:#2c2c32;--bar:#000;--goal:#e4262c;--live:#ff3b30;
@@ -90,6 +90,7 @@ body{background:radial-gradient(1100px 480px at 8% -8%,var(--glow),transparent 6
 .bar h1{display:flex;align-items:center;gap:.4rem;font-weight:800;letter-spacing:.06em}
 .bar h1 em{font-style:normal;color:var(--goal)}
 .mk{display:inline-grid;place-items:center;width:1.5rem;height:1.5rem;background:var(--goal);color:#fff;font-size:.8rem;transform:skew(-10deg);margin-right:.2rem}
+.lp::before{content:"";display:inline-block;width:.5rem;height:.5rem;border-radius:50%;background:#fff;margin-right:.4rem}
 .lp{font:700 .85rem var(--d);letter-spacing:.08em;color:#fff;background:var(--live);border-radius:999px;padding:.1rem .7rem;margin:0 0 .6rem;animation:p 1.6s infinite}
 .game{border-left:4px solid color-mix(in srgb,var(--tc,#e4262c) 65%,#fff 35%);background:linear-gradient(100deg,color-mix(in srgb,var(--tc,#e4262c) 20%,var(--paper)),var(--paper) 48%);animation:up .45s both;animation-delay:calc(var(--i,0)*45ms)}
 @keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
@@ -135,8 +136,8 @@ body{background:radial-gradient(1100px 480px at 8% -8%,var(--glow),transparent 6
 </head>
 <body>
 <header class="top">
-  <div class="bar"><h1><span class="mk">▲</span>SCORE<em>BOARD</em></h1><span id="livepill" class="lp" hidden></span>
-    <nav id="tabs"><button data-tab="scores">⚡ Scores</button><button data-tab="NHL">🏒 NHL</button><button data-tab="NFL">🏈 NFL</button><button data-tab="standings">🏆 Standings</button></nav></div>
+  <div class="bar"><h1>SCORES <em>&amp; WHATNOT</em></h1><span id="livepill" class="lp" hidden></span>
+    <nav id="tabs"><button data-tab="scores">Scores</button><button data-tab="NHL">NHL</button><button data-tab="NFL">NFL</button><button data-tab="standings">Standings</button></nav></div>
 </header>
 <main class="wrap" id="view"></main>
 <footer class="foot" id="foot"></footer>
@@ -266,7 +267,7 @@ const sd = (t, g, other) => { const lose = g.state === "final" && +t.s < +other.
   return `<div class="sd ${lose ? "l" : ""}">${mark(t)}<b>${esc(t.ab)}${t.rec ? `<span class="rec">${esc(t.rec)}</span>` : ""}</b><span>${g.state === "pre" ? "" : esc(t.s == null ? "" : t.s)}</span></div>`; };
 function paintFoot(){
   const el = $("foot"), live = SCORES.filter(g => g.state === "live").length, lp = $("livepill");
-  if (lp) { lp.hidden = !live; lp.textContent = "● " + live + " LIVE"; }
+  if (lp) { lp.hidden = !live; lp.textContent = live + " LIVE"; }
   if (el) el.innerHTML = `<b>Status</b> · Saved games: ${SAVED.length}${LATEST_DATE ? " (latest " + esc(fmtDay(LATEST_DATE)) + ")" : ""} · NHL live feed: ${esc(FEED.nhl)}${FEED.espnHockey === "used" ? " (showing ESPN scores only, no goal details)" : ""} · NFL live feed: ${esc(FEED.nfl)} · NHL standings: ${standLive ? "live" : "saved copy"}`;
 }
 const tile = g => { const inner = `<div class="meta"><span>${g.league}</span><span>${g.state === "live" ? '<i class="dot"></i>' : ""}${esc(g.detail)}</span></div>${sd(g.away, g, g.home)}${sd(g.home, g, g.away)}`;
@@ -348,7 +349,7 @@ const ini = n => String(n || "?").split(/\s+/).map(x => x[0]).slice(0, 2).join("
 const face = (src, name, p, size) => `<span class="hs ${size || ""}" data-hs="${esc((p && p.sport) || "")}|${esc((p && p.ab) || "")}|${esc(name)}" data-src="${esc(src || "")}" aria-hidden="true">${esc(ini(name))}</span>`;
 const playRow = (p, teamName, attrs) => `<li data-kind="${esc(p.kind)}"><div class="pl"><span class="clock">${esc(p.clock)}</span>${face(p.img, p.who, p, "sm")}
   <span class="who"><b>${esc(p.who)}</b> · ${esc(teamName)}${p.kind === "fg" ? '<span class="tag fgt">FG</span>' : p.kind === "td" ? '<span class="tag tdt">TD</span>' : ""}${/power|short|empty|penalty/i.test(p.type) ? `<span class="tag">${esc(p.type.replace(" goal", ""))}</span>` : ""}<small>${esc(p.type)} – ${esc(p.assist)}</small></span>
-  <button class="play" ${attrs}>▶ ${p.embed && !isYT(p.embed) ? "Watch" : "Play card"}</button></div><div class="clip" hidden></div></li>`;
+  <button class="play" ${attrs}>${p.embed && !isYT(p.embed) ? "Watch" : "Play card"}</button></div><div class="clip" hidden></div></li>`;
 const isYT = e => e && /youtube\.com\/embed/.test(e.src || "");
 const findLinks = p => { const q = encodeURIComponent(`${p.who} ${p.kind === "fg" ? "field goal" : p.kind === "td" ? "touchdown" : "goal"} ${p.ab || ""} ${p.type || ""}`.trim());
   return `<span class="finds">Find the clip: <a href="https://www.youtube.com/results?search_query=${q}" target="_blank" rel="noopener">YouTube</a><a href="https://x.com/search?q=${q}&f=video" target="_blank" rel="noopener">X</a><a href="https://www.reddit.com/search/?q=${q}" target="_blank" rel="noopener">Reddit</a></span>`; };
@@ -356,7 +357,7 @@ const embed = p => { const e = p.embed;
   const pm = String(p.assist || "").match(/from (.+)$/), pass = pm ? pm[1].replace(/\s*\(.*$/, "").trim() : "";
   const faces = face(p.img, p.who, p, "lg") + (p.img2 || pass ? face(p.img2, pass, p, "lg") : "");
   const hasVideo = e && !isYT(e);
-  const link = p.exact && p.url ? `<a class="big" href="${esc(p.url)}" target="_blank" rel="noopener">↗ Open the clip</a>` : "";
+  const link = p.exact && p.url ? `<a class="big" href="${esc(p.url)}" target="_blank" rel="noopener">Open the clip</a>` : "";
   const card = `<div class="pcard">${faces}<div class="tx"><b>${esc(p.who)}</b><small>${esc(p.type)} – ${esc(p.assist)}</small>${p.sc ? `<span class="after">${esc(p.clock)} · ${esc(p.sc)}</span>` : `<span class="after">${esc(p.clock)}</span>`}</div>${link}</div>`;
   if (!e) return card + `<div class="finds-row">${findLinks(p)}</div>`;
   const m = e.kind === "video" ? `<video src="${esc(e.src)}" controls autoplay playsinline></video>`
@@ -498,7 +499,7 @@ const savedDetail = (lg, id) => { const g = SAVED.find(x => x.sport === lg && St
   let line = g.ls || null;
   if (!line && lg === "NHL") { const pn = c => /^OT/.test(c) ? 4 : (+(c.match(/^(\d)/) || [])[1] || 1), cols = Math.max(3, ...g.plays.map(p => pn(p.clock))); line = {cols:[], away:[], home:[]};
     for (let i = 0; i < cols; i++) { line.cols.push(i < 3 ? String(i + 1) : "OT"); line.away.push(g.plays.filter(p => pn(p.clock) - 1 === i && p.team === "away").length); line.home.push(g.plays.filter(p => pn(p.clock) - 1 === i && p.team === "home").length); } }
-  const vids = (g.vids || []).map(v => ({label:v.label, embed:{kind:"iframe", src:BC + v.id}, url:v.url})).concat((g.hl || []).map(v => ({label:v.label, embed:v.yt ? {kind:"iframe", src:"https://www.youtube.com/embed/" + v.yt + "?autoplay=1&rel=0"} : v.src ? {kind:"video", src:v.src} : null, url:v.url})));
+  const vids = (g.vids || []).map(v => ({label:v.label, embed:{kind:"iframe", src:BC + v.id}, url:v.url})).concat((g.hl || []).map(v => ({label:v.label, embed:v.emb ? {kind:"iframe", src:v.emb} : v.yt ? {kind:"iframe", src:"https://www.youtube.com/embed/" + v.yt + "?autoplay=1&rel=0"} : v.src ? {kind:"video", src:v.src} : null, url:v.url})));
   return {league:lg, state:"final", detail:(g.pre ? "Preseason · " : "") + g.status, away:{ab:g.away.ab || g.away.n, name:g.away.n, logo:g.away.logo, logoDark:g.away.logoDark, s:g.away.s, rec:g.recA},
     home:{ab:g.home.ab || g.home.n, name:g.home.n, logo:g.home.logo, logoDark:g.home.logoDark, s:g.home.s, rec:g.recH}, plays:g.plays, line, stats:g.stats || [], vids, extra:"", offline:true}; };
 
@@ -537,7 +538,7 @@ function paintGame(){
   $("dstats").innerHTML = d.stats && d.stats.length ? `<div class="dsub">Team stats</div><table class="ls stats"><thead><tr><th>${esc(d.away.ab)}</th><th></th><th>${esc(d.home.ab)}</th></tr></thead><tbody>${d.stats.map(r => `<tr><td>${esc(r[1])}</td><td>${esc(r[0])}</td><td>${esc(r[2])}</td></tr>`).join("")}</tbody></table>` : "";
   const vsig = (d.vids || []).map(v => v.label).join("|");
   if (vsig !== det.vsig) { det.vsig = vsig; det.vopen = null;
-    $("dvids").innerHTML = d.vids && d.vids.length ? `<div class="dsub">Video</div><div class="vb">${d.vids.map((v, i) => `<button class="play" data-dv="${i}">▶ ${esc(v.label.length > 38 ? v.label.slice(0, 36) + "…" : v.label)}</button>`).join("")}</div><div class="clip" id="dvbox" hidden></div>` : ""; }
+    $("dvids").innerHTML = d.vids && d.vids.length ? `<div class="dsub">Video</div><div class="vb">${d.vids.map((v, i) => `<button class="play" data-dv="${i}">${esc(v.label.length > 38 ? v.label.slice(0, 36) + "…" : v.label)}</button>`).join("")}</div><div class="clip" id="dvbox" hidden></div>` : ""; }
   const sig = d.plays.map(p => p.clock + p.who + p.type + (p.embed ? 1 : 0)).join("|");
   if (sig !== det.sig) {  /* only rebuild the list when something scored, so an open clip keeps playing */
     det.sig = sig;
