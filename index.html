@@ -304,7 +304,7 @@ const playRow = (p, teamName, attrs) => `<li data-kind="${esc(p.kind)}"><div cla
   <span class="who"><b>${esc(p.who)}</b> · ${esc(teamName)}${p.kind === "fg" ? '<span class="tag">FG</span>' : ""}<small>${esc(p.type)} – ${esc(p.assist)}</small></span>
   <button class="play" ${attrs}>▶ Watch</button></div><div class="clip" hidden></div></li>`;
 const ini = n => String(n || "?").split(/\s+/).map(x => x[0]).slice(0, 2).join("").toUpperCase();
-const face = (src, name) => src ? `<img class="hs" src="${esc(src)}" alt="${esc(name)}" onerror="this.style.visibility='hidden'">` : `<span class="hs" aria-hidden="true">${esc(ini(name))}</span>`;
+const face = (src, name) => src ? `<img class="hs" src="${esc(src)}" alt="${esc(name)}" onerror="this.outerHTML='<span class=&quot;hs&quot;>${esc(ini(name))}</span>'">` : `<span class="hs" aria-hidden="true">${esc(ini(name))}</span>`;
 const isYT = e => e && /youtube\.com\/embed/.test(e.src || "");
 const embed = p => { const e = p.embed;
   /* player card: headshot + what happened + a button for the video */
