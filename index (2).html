@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Last Night's Scoring</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ice:#EAF0F4; --paper:#F8FAFB; --ink:#0E1B2C; --muted:#5B6B7C; --line:#C9D4DD;
+  --goal:#E4262C; --turf:#1F6B4A;
+  --display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --ice:#0B1420; --paper:#121E2D; --ink:#E8EEF3; --muted:#94A4B4; --line:#25364A; }
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:1rem}
+body{margin:0;background:var(--ice);color:var(--ink);font:400 16px/1.5 var(--body)}
+.wrap{max-width:880px;margin:0 auto;padding:2rem 1.25rem 4rem}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1.5rem}
+h1{font:800 clamp(2.6rem,8vw,4.6rem)/.92 var(--display);margin:0;letter-spacing:-.01em}
+.date{color:var(--muted);margin:.5rem 0 0}
+.tabs{display:flex;gap:.25rem;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:.25rem}
+.tabs button{font:700 1.1rem var(--display);letter-spacing:.04em;border:0;background:none;color:var(--muted);padding:.35rem 1.1rem;border-radius:999px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+button:focus-visible,summary:focus-visible{outline:3px solid var(--goal);outline-offset:2px}
+.totals{display:flex;gap:2.5rem;padding:1rem 0 1.25rem;border-bottom:2px solid var(--ink);margin-bottom:1.5rem}
+.totals b{display:block;font:800 3rem/1 var(--display)}
+.totals span{color:var(--muted);font-size:.9rem}
+.game{background:var(--paper);border:1px solid var(--line);margin-bottom:1.25rem}
+.score{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.25rem 1rem;padding:1rem 1.25rem .5rem}
+.team{display:flex;align-items:center;gap:.7rem;font:700 1.7rem/1.1 var(--display)}
+.chip{width:.7rem;height:1.6rem;border-radius:2px;flex:none}
+.logo{width:2.3rem;height:2.3rem;object-fit:contain;flex:none}
+.num{font:800 2.6rem/1 var(--display);text-align:right;min-width:2ch}
+.team.lose,.num.lose{opacity:.55}
+.status{padding:0 1.25rem;color:var(--muted);font-size:.85rem}
+.strip{position:relative;height:26px;margin:.6rem 1.25rem 1rem;border-bottom:2px solid var(--line)}
+.strip i{position:absolute;bottom:-7px;width:12px;height:12px;border-radius:50%;border:2px solid var(--ink);transform:translateX(-50%);background:var(--c)}
+.strip u{position:absolute;bottom:-2px;width:1px;height:8px;background:var(--line)}
+.plays{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.plays li{display:grid;grid-template-columns:3.6rem 1fr auto;gap:.75rem;align-items:center;padding:.7rem 1.25rem;border-bottom:1px solid var(--line)}
+.plays li:last-child{border-bottom:0}
+.clock{font:700 1.15rem var(--display);color:var(--muted)}
+.who b{font-weight:600}
+.who small{display:block;color:var(--muted)}
+.play{display:inline-flex;align-items:center;gap:.4rem;border:2px solid var(--ink);background:none;color:var(--ink);font:700 1rem var(--display);letter-spacing:.04em;padding:.3rem .8rem;border-radius:999px;cursor:pointer}
+.play:hover{background:var(--ink);color:var(--paper)}
+.play svg{width:.8rem;height:.8rem;fill:currentColor}
+.leaders{margin:2rem 0 0}
+.leaders h2{font:800 1.8rem var(--display);margin:0 0 .5rem}
+.leaders ol{margin:0;padding:0;list-style:none;border-top:2px solid var(--ink)}
+.leaders li{display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--line)}
+.sample{color:var(--muted);font-size:.85rem;margin-top:2rem}
+dialog{border:0;padding:0;width:min(760px,94vw);background:var(--paper);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.45)}
+dialog::backdrop{background:rgba(6,12,20,.75)}
+dialog[open]{animation:pop .18s ease-out}
+@keyframes pop{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+.dhead{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;padding:1rem 1.25rem}
+.dhead h3{font:800 1.7rem/1.1 var(--display);margin:0}
+.dhead p{margin:.15rem 0 0;color:var(--muted)}
+.close{border:2px solid var(--ink);background:none;color:var(--ink);font:700 1rem var(--display);padding:.25rem .8rem;border-radius:999px;cursor:pointer}
+.video{aspect-ratio:16/9;background:#05090F;display:grid;place-items:center;color:#9FB0C0;text-align:center;padding:1rem}
+.video iframe{width:100%;height:100%;border:0}
+@media (prefers-reduced-motion:reduce){dialog[open]{animation:none}}
+@media (max-width:520px){.plays li{grid-template-columns:3rem 1fr}.plays .play{grid-column:2;justify-self:start}.totals{gap:1.5rem}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Last night's scoring</h1>
+      <p class="date" id="date"></p>
+    </div>
+    <div class="tabs" role="group" aria-label="Sport">
+      <button data-sport="NHL" aria-pressed="true">NHL</button>
+      <button data-sport="NFL" aria-pressed="false">NFL</button>
+    </div>
+  </header>
+
+  <div class="totals" id="totals"></div>
+  <main id="games"></main>
+  <section class="leaders" id="leaders"></section>
+  <p class="sample" id="sampleNote">Sample data for design only. Run fetch_goals.py to load real games.</p>
+</div>
+
+<dialog id="clip" aria-labelledby="clipTitle">
+  <div class="dhead">
+    <div><h3 id="clipTitle"></h3><p id="clipSub"></p></div>
+    <button class="close" id="closeClip">Close</button>
+  </div>
+  <div class="video" id="video"></div>
+</dialog>
+
+<script src="data.js"></script>
+<script>
+/* ---------- SAMPLE DATA (Stage 3 replaces this with a real file) ----------
+   t = minutes into the game (0-60). v = YouTube video ID of the official clip, or null. */
+const SAMPLE = [
+ {sport:"NHL", status:"Final", away:{n:"Toronto",c:"#00205B",s:4}, home:{n:"Boston",c:"#FFB81C",s:3}, plays:[
+  {t:6,  clock:"1st 6:12",  team:"away", who:"A. Marner",  assist:"J. Tavares",  type:"Goal", v:null},
+  {t:14, clock:"1st 14:40", team:"home", who:"D. Pastrnak",assist:"B. Marchand", type:"Power-play goal", v:null},
+  {t:27, clock:"2nd 7:05",  team:"away", who:"A. Matthews",assist:"W. Nylander", type:"Goal", v:null},
+  {t:33, clock:"2nd 13:51", team:"home", who:"C. Coyle",   assist:"unassisted",  type:"Goal", v:null},
+  {t:44, clock:"3rd 4:20",  team:"home", who:"B. Marchand",assist:"D. Pastrnak", type:"Goal", v:null},
+  {t:52, clock:"3rd 12:08", team:"away", who:"M. Rielly",  assist:"A. Matthews", type:"Goal", v:null},
+  {t:59, clock:"3rd 19:02", team:"away", who:"W. Nylander",assist:"empty net",   type:"Empty-net goal", v:null}]},
+ {sport:"NHL", status:"Final / OT", away:{n:"Edmonton",c:"#FF4C00",s:3}, home:{n:"Vegas",c:"#B4975A",s:2}, plays:[
+  {t:9,  clock:"1st 9:30",  team:"home", who:"J. Eichel",  assist:"M. Stone",    type:"Goal", v:null},
+  {t:31, clock:"2nd 11:15", team:"away", who:"L. Draisaitl",assist:"C. McDavid", type:"Power-play goal", v:null},
+  {t:48, clock:"3rd 8:44",  team:"home", who:"I. Barbashev",assist:"J. Eichel",  type:"Goal", v:null},
+  {t:57, clock:"3rd 17:21", team:"away", who:"Z. Hyman",   assist:"E. Kane",     type:"Goal", v:null},
+  {t:63, clock:"OT 3:02",   team:"away", who:"C. McDavid", assist:"L. Draisaitl",type:"Overtime winner", v:null}]},
+ {sport:"NFL", status:"Final", away:{n:"Kansas City",c:"#E31837",s:27}, home:{n:"Buffalo",c:"#00338D",s:24}, plays:[
+  {t:7,  clock:"Q1 7:48",  team:"home", who:"J. Cook",     assist:"2-yd run",              type:"Rushing TD", v:null},
+  {t:19, clock:"Q2 4:10",  team:"away", who:"T. Kelce",    assist:"18-yd pass from P. Mahomes", type:"Receiving TD", v:null},
+  {t:28, clock:"Q2 13:36", team:"home", who:"K. Coleman",  assist:"41-yd pass from J. Allen",   type:"Receiving TD", v:null},
+  {t:41, clock:"Q3 4:55",  team:"away", who:"I. Pacheco",  assist:"9-yd run",              type:"Rushing TD", v:null},
+  {t:56, clock:"Q4 11:02", team:"away", who:"R. Rice",     assist:"33-yd pass from P. Mahomes", type:"Receiving TD", v:null}]}
+];
+/* data.js (written by fetch_goals.py) holds real games; without it the page shows the sample. */
+const LIVE = Array.isArray(window.LIVE_GAMES);
+const GAMES = LIVE ? window.LIVE_GAMES : SAMPLE;
+
+const sportColor = {NHL:"var(--goal)", NFL:"var(--turf)"};
+let sport = "NHL";
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mark = t => t.logo
+  ? `<picture>${t.logoDark ? `<source media="(prefers-color-scheme: dark)" srcset="${esc(t.logoDark)}">` : ""}<img class="logo" src="${esc(t.logo)}" alt="" data-c="${esc(t.c)}"></picture>`
+  : `<span class="chip" style="background:${t.c}"></span>`;
+document.addEventListener("error", e => {  /* if a logo fails to load, fall back to the color bar */
+  const el = e.target;
+  if (el.classList && el.classList.contains("logo")) {
+    const chip = document.createElement("span");
+    chip.className = "chip"; chip.style.background = el.dataset.c;
+    (el.closest("picture") || el).replaceWith(chip);
+  }
+}, true);
+
+
+function render(){
+  const games = GAMES.filter(g => g.sport === sport);
+  const unit = sport === "NHL" ? "goals" : "touchdowns";
+  $("sampleNote").hidden = LIVE;
+  const plays = games.flatMap(g => g.plays);
+  $("totals").innerHTML =
+    `<div><b>${games.length}</b><span>games</span></div><div><b>${plays.length}</b><span>${unit}</span></div>`;
+
+  if (!games.length) {
+    $("games").innerHTML = `<p style="color:var(--muted)">No ${sport} games loaded for this night.</p>`;
+    $("leaders").innerHTML = ""; $("games").dataset.g = "[]";
+    return;
+  }
+  $("games").innerHTML = games.map((g,gi) => {
+    const awayWin = g.away.s > g.home.s;
+    const total = Math.max(60, ...g.plays.map(p => p.t + 1));
+    const dots = g.plays.map(p => {
+      const c = (p.team === "away" ? g.away : g.home).c;
+      return `<i style="left:${(p.t/total*100).toFixed(1)}%;--c:${c}" title="${esc(p.clock)} ${esc(p.who)}"></i>`;
+    }).join("");
+    const ticks = [15,30,45].map(m => `<u style="left:${m/total*100}%"></u>`).join("");
+    const rows = g.plays.map((p,pi) => {
+      const tm = p.team === "away" ? g.away : g.home;
+      return `<li>
+        <span class="clock">${esc(p.clock)}</span>
+        <span class="who"><b>${esc(p.who)}</b> &middot; ${esc(tm.n)}<small>${esc(p.type)} &ndash; ${esc(p.assist)}</small></span>
+        <button class="play" data-g="${gi}" data-p="${pi}" aria-label="Watch ${esc(p.who)} ${esc(p.type)}">
+          <svg viewBox="0 0 10 10"><path d="M1 0l9 5-9 5z"/></svg>Watch</button></li>`;
+    }).join("");
+    return `<article class="game">
+      <div class="score">
+        <div class="team ${awayWin?'':'lose'}">${mark(g.away)}${esc(g.away.n)}</div>
+        <div class="num ${awayWin?'':'lose'}">${g.away.s}</div>
+        <div class="team ${awayWin?'lose':''}">${mark(g.home)}${esc(g.home.n)}</div>
+        <div class="num ${awayWin?'lose':''}">${g.home.s}</div>
+      </div>
+      <div class="status">${esc(g.status)}</div>
+      <div class="strip" aria-hidden="true">${ticks}${dots}</div>
+      <ul class="plays">${rows}</ul></article>`;
+  }).join("");
+  $("games").dataset.g = JSON.stringify(games.map(g => GAMES.indexOf(g)));
+
+  const tally = {};
+  games.forEach(g => g.plays.forEach(p => {
+    const k = p.who; tally[k] = tally[k] || {n:0, team:(p.team==="away"?g.away:g.home).n}; tally[k].n++;
+  }));
+  const top = Object.entries(tally).sort((a,b) => b[1].n - a[1].n).slice(0,5);
+  $("leaders").innerHTML = `<h2>Most ${unit} last night</h2><ol>` +
+    top.map(([k,v]) => `<li><span>${esc(k)} <span style="color:var(--muted)">${esc(v.team)}</span></span><b>${v.n}</b></li>`).join("") + `</ol>`;
+}
+
+function openClip(gi, pi){
+  const idx = JSON.parse($("games").dataset.g)[gi];
+  const g = GAMES[idx], p = g.plays[pi];
+  $("clipTitle").textContent = `${p.who} \u2013 ${p.type}`;
+  $("clipSub").textContent = `${g.away.n} at ${g.home.n} \u00b7 ${p.clock}`;
+  $("video").innerHTML = p.v
+    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(p.v)}?autoplay=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Highlight clip"></iframe>`
+    : p.url
+    ? `<div><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:#fff;font:700 1.5rem var(--display)">${p.exact ? "Open the clip" : "Search for the clip"}</a><br>Opens in a new tab.</div>`
+    : `<div>The official clip will play here.<br>No clip is attached to this sample play yet.</div>`;
+  $("clip").showModal();
+}
+function closeClip(){ $("clip").close(); $("video").innerHTML = ""; }
+
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+  sport = b.dataset.sport;
+  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  render();
+}));
+$("games").addEventListener("click", e => {
+  const b = e.target.closest(".play"); if (b) openClip(+b.dataset.g, +b.dataset.p);
+});
+$("closeClip").addEventListener("click", closeClip);
+$("clip").addEventListener("click", e => { if (e.target === $("clip")) closeClip(); });
+$("clip").addEventListener("close", () => { $("video").innerHTML = ""; });
+
+$("date").textContent = (window.LIVE_DATE ? new Date(window.LIVE_DATE + "T12:00:00") : new Date(Date.now() - 864e5)).toLocaleDateString(undefined, {weekday:"long", month:"long", day:"numeric"});
+render();
+</script>
+</body>
+</html>
