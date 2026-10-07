@@ -202,6 +202,71 @@ def hl_match(items, who, kind, assist, used):
     return best
 
 
+# ------------------------------------------------------------------ @NFLTDsVideos on X (touchdown clips, embeddable)
+# X lets anyone embed a post. We read the account's public timeline, match posts to touchdowns by player name, and embed them.
+# This uses X's unofficial embed feed, so it can stop working or be rate limited; if it does, nothing else is affected.
+X_ACCOUNT = "NFLTDsVideos"
+X_CACHE = {}
+
+
+def x_tweets():
+    if "t" in X_CACHE:
+        return X_CACHE["t"]
+    out = []
+    try:
+        req = urllib.request.Request(f"https://syndication.twitter.com/srv/timeline-profile/screen-name/{X_ACCOUNT}",
+                                     headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+                                              "Accept-Language": "en-US,en;q=0.9"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            html = resp.read().decode("utf-8", "replace")
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+        if m:
+            seen = set()
+
+            def walk(o):
+                if isinstance(o, dict):
+                    tid = o.get("id_str")
+                    text = o.get("full_text") or o.get("text")
+                    if tid and text and o.get("created_at") and tid not in seen:
+                        seen.add(tid)
+                        try:
+                            when = datetime.strptime(o["created_at"], "%a %b %d %H:%M:%S %z %Y")
+                            out.append({"id": tid, "text": str(text), "day": when.strftime("%Y-%m-%d")})
+                        except Exception:
+                            pass
+                    for v in o.values():
+                        walk(v)
+                elif isinstance(o, list):
+                    for v in o:
+                        walk(v)
+            walk(json.loads(m.group(1)))
+        print(f"  X timeline: {len(out)} posts read")
+    except Exception as err:
+        print(f"  X timeline not available: {err}")
+    X_CACHE["t"] = out
+    return out
+
+
+def x_match(who, assist, date, used):
+    last = who.split()[-1].lower() if who.split() else ""
+    if len(last) < 3:
+        return None
+    lo = (datetime.strptime(date, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    hi = (datetime.strptime(date, "%Y-%m-%d") + timedelta(days=2)).strftime("%Y-%m-%d")
+    yds = (re.search(r"(\d+)-yd", assist) or [None, None])[1]
+    best, best_score = None, 0
+    for t in x_tweets():
+        if t["id"] in used or not (lo <= t["day"] <= hi):
+            continue
+        low = t["text"].lower()
+        if last not in low:
+            continue
+        score = 1 + (3 if yds and re.search(rf"\b{yds}[- ]?(yd|yard)", low) else 0)
+        if score > best_score:
+            best, best_score = t, score
+    return best
+
+
 def city_name(place, common):
     """'New York' + 'Giants' -> 'NY Giants' so the two NY/LA teams are distinct."""
     short = {"New York": "NY", "Los Angeles": "LA"}
@@ -537,6 +602,7 @@ def parse_nfl_game(ev, date, prev=None):
     if HL_KEY and (recent_hl or not prev.get("hlt")):
         items = hl_fetch(date, away.get("dn"), home.get("dn"))
     used_hl = set()
+    used_x = set()
     heads = nfl_heads(summary)
     for t in (away, home):  # the full rosters fill in anyone the box score missed (kickers, receivers...)
         for k, v in nfl_roster_heads(t["id"]).items():
@@ -582,6 +648,12 @@ def parse_nfl_game(ev, date, prev=None):
                 h = items[hi]
                 embed = {"kind": "iframe", "src": h["embedUrl"]}
                 url, exact = h.get("url") or h["embedUrl"], True
+        if not embed and not is_fg:
+            tw = x_match(who, assist, date, used_x)
+            if tw:
+                used_x.add(tw["id"])
+                embed = {"kind": "iframe", "src": f"https://platform.twitter.com/embed/Tweet.html?id={tw['id']}&theme=dark&dnt=true"}
+                url, exact = f"https://x.com/{X_ACCOUNT}/status/{tw['id']}", True
         before = old_plays.get((who, f"{label} {int(mm)}:{ss}"))
         if not embed and before and before.get("embed") and not before.get("ofGame"):
             embed, url, exact = before["embed"], before["url"], True  # found on an earlier run: keep it
