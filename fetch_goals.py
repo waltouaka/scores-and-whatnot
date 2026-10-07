@@ -130,11 +130,14 @@ def parse_nhl_game(game_id, date):
         exact = bool(url)
         if not url:
             url = search_link(f"{who} goal {away['n']} vs {home['n']} {date}")
+        clip_id = d.get("highlightClip")
+        embed = ({"kind": "iframe", "src": f"https://players.brightcove.net/6415718365001/EXtG1xJ7H_default/index.html?videoId={clip_id}"}
+                 if clip_id else None)
 
         plays.append({
             "t": round(minute_in_game, 1), "clock": f"{label} {int(mm)}:{ss}", "team": side,
             "who": who, "assist": ", ".join(a for a in assists if a) or "unassisted",
-            "type": nhl_goal_type(d, home["id"]), "v": None, "url": url, "exact": exact,
+            "type": nhl_goal_type(d, home["id"]), "kind": "goal", "embed": embed, "url": url, "exact": exact,
         })
 
     for t in (away, home):
@@ -183,17 +186,20 @@ def find_video(videos, who, used):
     """Best-effort: look for an ESPN highlight video that mentions this player scoring."""
     last = who.split()[-1].lower() if who else ""
     if len(last) < 3:
-        return None
+        return None, None
     for i, v in enumerate(videos):
         if i in used:
             continue
         blob = (v.get("headline", "") + " " + v.get("description", "")).lower()
-        if last in blob and any(k in blob for k in ("touchdown", " td", "scores", "end zone")):
-            href = v.get("links", {}).get("web", {}).get("href")
-            if href:
+        if last in blob and any(k in blob for k in ("touchdown", " td", "scores", "end zone", "field goal", " fg", "kicks")):
+            links = v.get("links", {})
+            href = links.get("web", {}).get("href")
+            src = links.get("source", {})
+            mp4 = (src.get("HD") or src.get("full") or links.get("mobile", {}).get("source") or {}).get("href")
+            if href or mp4:
                 used.add(i)
-                return href
-    return None
+                return href, mp4
+    return None, None
 
 
 def parse_nfl_game(ev, date):
@@ -209,7 +215,9 @@ def parse_nfl_game(ev, date):
     plays = []
     for sp in summary.get("scoringPlays", []):
         ttext = sp.get("type", {}).get("text", "")
-        if "touchdown" not in ttext.lower() and sp.get("scoringType", {}).get("name") != "touchdown":
+        is_td = "touchdown" in ttext.lower() or sp.get("scoringType", {}).get("name") == "touchdown"
+        is_fg = "field goal" in ttext.lower()
+        if not (is_td or is_fg):
             continue
         p = sp.get("period", {}).get("number", 1)
         mm, ss = (sp.get("clock", {}).get("displayValue", "0:00").split(":") + ["0"])[:2]
@@ -218,17 +226,20 @@ def parse_nfl_game(ev, date):
         label = f"Q{p}" if p <= 4 else "OT"
 
         who, assist = split_td_text(sp.get("text", ""), ttext)
+        if is_fg:
+            assist = assist.replace("field Goal", "field goal")
         side = "home" if sp.get("team", {}).get("id") == home["id"] else "away"
 
-        url = find_video(videos, who, used)
+        url, mp4 = find_video(videos, who, used)
         exact = bool(url)
         if not url:
-            url = search_link(f"{who} touchdown {away['n']} vs {home['n']} {date} NFL highlights")
+            url = search_link(f"{who} {'field goal' if is_fg else 'touchdown'} {away['n']} vs {home['n']} {date} NFL highlights")
 
         plays.append({
             "t": round(minute_in_game, 1), "clock": f"{label} {int(mm)}:{ss}", "team": side,
-            "who": who, "assist": assist, "type": ttext.replace(" Touchdown", " TD") or "TD",
-            "v": None, "url": url, "exact": exact,
+            "who": who, "assist": assist, "type": "Field goal" if is_fg else (ttext.replace(" Touchdown", " TD") or "TD"),
+            "kind": "fg" if is_fg else "td", "embed": {"kind": "video", "src": mp4} if mp4 else None,
+            "url": url, "exact": exact,
         })
 
     for t in (away, home):
