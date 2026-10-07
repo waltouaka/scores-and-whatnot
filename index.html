@@ -100,6 +100,7 @@ body{background:radial-gradient(1100px 480px at 8% -8%,var(--glow),transparent 6
 .num{font-size:3rem}
 .tot b{background:linear-gradient(180deg,#fff,#8e8e99);-webkit-background-clip:text;background-clip:text;color:transparent}
 .tag.tdt{color:#7cffb2;border-color:#1f6b45}.tag.fgt{color:#ffd166;border-color:#7a5c14}
+.clip iframe.tw{aspect-ratio:auto;height:640px;max-width:560px;background:transparent}
 .hs{overflow:hidden;position:relative}.hs img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
 .hs.sm{width:40px;height:40px;font-size:.85rem}.hs.lg{width:76px;height:76px;font-size:1.4rem}
 .hs.lg+.hs.lg{margin-left:-1.6rem}
@@ -361,7 +362,7 @@ const embed = p => { const e = p.embed;
   const card = `<div class="pcard">${faces}<div class="tx"><b>${esc(p.who)}</b><small>${esc(p.type)} – ${esc(p.assist)}</small>${p.sc ? `<span class="after">${esc(p.clock)} · ${esc(p.sc)}</span>` : `<span class="after">${esc(p.clock)}</span>`}</div>${link}</div>`;
   if (!e) return card + `<div class="finds-row">${findLinks(p)}</div>`;
   const m = e.kind === "video" ? `<video src="${esc(e.src)}" controls autoplay playsinline></video>`
-    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">If the video box stays blank, use the button above.</p>`;
+    : `<iframe class="${/platform\.twitter\.com/.test(e.src) ? "tw" : ""}" src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">If the video box stays blank, use the button above.</p>`;
   return card + m + (hasVideo ? "" : `<div class="finds-row">${findLinks(p)}</div>`); };
 function fillHeads(root){
   (root || document).querySelectorAll(".hs[data-hs]").forEach(el => {
