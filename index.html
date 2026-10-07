@@ -77,6 +77,19 @@ dialog::backdrop{background:rgba(0,0,0,.8)}
 .stats td:nth-child(2){color:var(--muted);font:500 .95rem var(--b)}
 .dsub{font:800 1.3rem var(--d);padding:.4rem 1.25rem}
 .vb{display:flex;flex-wrap:wrap;gap:.5rem;padding:0 1.25rem .8rem}
+.tools{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-bottom:1rem}
+.tools input{font:500 1rem var(--b);padding:.45rem .7rem;background:var(--paper2);color:var(--ink);border:1px solid var(--line);border-radius:6px;min-width:11rem}
+.pill{font:700 1rem var(--d);letter-spacing:.04em;background:var(--paper2);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:.3rem .95rem;cursor:pointer}
+.pill:hover{border-color:var(--ink)}
+.pill[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.pill:disabled{opacity:.35;cursor:default}
+.seg{display:flex;gap:.4rem;margin-bottom:.8rem}
+.wk{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.5rem;padding:0 1.25rem 1rem}
+.wk button{text-align:left;background:var(--paper2);color:var(--ink);border:1px solid var(--line);padding:.55rem .7rem;cursor:pointer}
+.wk button:hover{border-color:var(--ink)}
+.wk button[aria-current="true"]{border-color:var(--goal);box-shadow:inset 0 0 0 1px var(--goal)}
+.wk b{display:block;font:800 1.25rem/1.1 var(--d)}.wk small{color:var(--muted);font-size:.78rem}
+.wkh{font:800 1.1rem var(--d);color:var(--muted);padding:.4rem 1.25rem 0;letter-spacing:.05em;text-transform:uppercase}
 .tw{overflow-x:auto;border:1px solid var(--line);background:var(--paper);margin-bottom:1rem}
 .st-t{width:100%;border-collapse:collapse;font:600 1rem var(--b);min-width:620px}
 .st-t th,.st-t td{padding:.4rem .6rem;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
@@ -102,6 +115,11 @@ dialog::backdrop{background:rgba(0,0,0,.8)}
   <div id="dhead"></div><div id="dline"></div><div id="dvids"></div><div id="dstats"></div>
   <div class="dsub">Scoring</div>
   <ul class="plays" id="dplays"></ul>
+</dialog>
+
+<dialog id="weeks" aria-label="Choose a week">
+  <div class="dtop"><span>Choose a week</span><button class="close" id="closeWeeks">Close</button></div>
+  <div id="wkbody"></div>
 </dialog>
 
 <script src="data.js"></script>
@@ -158,8 +176,10 @@ const standRec = ab => { const t = STAND && STAND.teams.find(x => x.ab === ab); 
 const nhlRec = ab => standRec(ab) || fmtRec("NHL", TALLY["NHL" + ab]);
 
 let tab = "scores", SCORES = [], VIEW = [], nhlSkipUntil = 0;
+try { const t = localStorage.getItem("sb_tab"); if (["scores", "NHL", "NFL", "standings"].includes(t)) tab = t; } catch (e) {}
 const feeds = {nhl:"", nfl:""};
-const S = {scores:"live", NHL:null, NFL:null};
+const S = {scores:"live", NHL:null, NFL:null, stand:"NHL", f:"", kind:"all"};
+try { const t = localStorage.getItem("sb_stand"); if (t === "NHL" || t === "NFL") S.stand = t; } catch (e) {}
 
 /* ---------- small helpers ---------- */
 function logoFail(el){ const a = el.dataset.alt; if (a) { el.dataset.alt = ""; el.src = a; } else el.style.visibility = "hidden"; }
@@ -222,39 +242,62 @@ function scoresView(){
 /* ---------- NHL / NFL tabs ---------- */
 const stripHTML = lg => { const l = SCORES.filter(g => g.league === lg && g.state !== "final"); return l.length ? `<h2 style="margin-top:0">Live &amp; upcoming</h2><div class="grid">${l.map(tile).join("")}</div>` : ""; };
 function refreshStrip(){ const el = $("strip"); if (el && (tab === "NHL" || tab === "NFL")) el.innerHTML = stripHTML(tab); }
+const wkGroup = k => k >= 300 ? "Playoffs" : k >= 200 ? "Regular season" : k >= 100 ? "Preseason" : "Games";
+const wkInfo = () => nflWeeks().map(w => { const gs = SAVED.filter(g => g.sport === "NFL" && String(g.wkn || 0) === String(w.k)), ds = gs.map(g => g.date).sort();
+  return Object.assign({}, w, {games: gs.length, from: ds[0], to: ds[ds.length - 1], tds: gs.reduce((n, g) => n + g.plays.filter(p => p.kind !== "fg").length, 0)}); });
+const shortDay = x => x ? new Date(x + "T12:00:00").toLocaleDateString(undefined, {month:"short", day:"numeric"}) : "";
 function leagueView(lg){
-  let games, nav;
+  let games, nav, list, cur;
+  const strip = `<div id="strip">${stripHTML(lg)}</div>`;
   if (lg === "NHL") {
-    const ds = savedDates("NHL"); if (!ds.length) return `<div id="strip">${stripHTML(lg)}</div>` + noData;
-    const d = ds.includes(S.NHL) ? S.NHL : ds[0];
-    games = SAVED.filter(g => g.sport === "NHL" && g.date === d);
-    nav = `<select id="lsel" aria-label="Choose a night">${ds.map(x => `<option value="${x}"${x === d ? " selected" : ""}>${fmtDay(x)}</option>`).join("")}</select>`;
+    list = savedDates("NHL"); if (!list.length) return strip + noData;
+    cur = list.includes(S.NHL) ? S.NHL : list[0];
+    games = SAVED.filter(g => g.sport === "NHL" && g.date === cur);
+    nav = `<select id="lsel" aria-label="Choose a night">${list.map(x => `<option value="${x}"${x === cur ? " selected" : ""}>${fmtDay(x)}</option>`).join("")}</select>`;
   } else {
-    const ws = nflWeeks(); if (!ws.length) return `<div id="strip">${stripHTML(lg)}</div>` + noData;
-    const k = ws.some(w => String(w.k) === String(S.NFL)) ? String(S.NFL) : String(ws[0].k);
-    games = SAVED.filter(g => g.sport === "NFL" && String(g.wkn || 0) === k).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
-    nav = `<select id="lsel" aria-label="Choose a week">${ws.map(w => `<option value="${w.k}"${String(w.k) === k ? " selected" : ""}>${esc(w.label)}</option>`).join("")}</select>`;
+    const ws = nflWeeks(); if (!ws.length) return strip + noData;
+    list = ws.map(w => String(w.k)); cur = list.includes(String(S.NFL)) ? String(S.NFL) : list[0];
+    games = SAVED.filter(g => g.sport === "NFL" && String(g.wkn || 0) === cur).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+    const w = ws.find(x => String(x.k) === cur);
+    nav = `<button type="button" class="pill" id="wkbtn" aria-haspopup="dialog">${esc(w ? w.label : "Week")} ▾ all weeks</button>`;
   }
+  const i = list.indexOf(cur), arrows = `<button type="button" class="pill" data-nav="1" ${i >= list.length - 1 ? "disabled" : ""} aria-label="Earlier">‹ Earlier</button><button type="button" class="pill" data-nav="-1" ${i <= 0 ? "disabled" : ""} aria-label="Later">Later ›</button>`;
   VIEW = games;
   const plays = games.flatMap(g => g.plays), fg = plays.filter(p => p.kind === "fg").length, main = plays.length - fg;
   const tot = `<div class="tot"><div><b>${games.length}</b><span>games</span></div><div><b>${main}</b><span>${lg === "NHL" ? "goals" : "touchdowns"}</span></div>${lg === "NFL" ? `<div><b>${fg}</b><span>field goals</span></div>` : ""}</div>`;
-  return `<div id="strip">${stripHTML(lg)}</div><div class="hd"><h2>${lg} results</h2>${nav}</div>${tot}` + games.map((g, gi) => {
+  const tools = `<div class="tools"><input id="tf" type="search" placeholder="Find a team" aria-label="Find a team" value="${esc(S.f)}">` +
+    (lg === "NFL" ? ["all", "td", "fg"].map(k => `<button type="button" class="pill" data-kind="${k}" aria-pressed="${S.kind === k}">${{all:"All scoring", td:"Touchdowns", fg:"Field goals"}[k]}</button>`).join("") : "") + `</div>`;
+  return strip + `<div class="hd"><h2>${lg} results</h2>${nav}${arrows}</div>${tot}${tools}<p class="note" id="nomatch" hidden>No games match.</p>` + games.map((g, gi) => {
     const aw = +g.away.s > +g.home.s, total = Math.max(60, ...g.plays.map(p => p.t + 1));
     const dots = g.plays.map(p => `<i class="${p.kind === "fg" ? "fg" : ""}" style="left:${(p.t / total * 100).toFixed(1)}%" title="${esc(p.clock + " " + p.who)}"></i>`).join("");
     const rows = g.plays.map((p, pi) => playRow(p, (p.team === "away" ? g.away : g.home).n, `data-g="${gi}" data-p="${pi}"`)).join("");
     const rc = r => r ? `<span class="rec">${esc(r)}</span>` : "";
-    return `<article class="game"><div class="sc"><div class="tm ${aw ? "" : "lose"}">${mark(g.away, "logo")}${esc(g.away.n)}${rc(g.recA)}</div><div class="num ${aw ? "" : "lose"}">${g.away.s}</div>
+    const tags = [g.away.n, g.away.ab, g.home.n, g.home.ab].join(" ").toLowerCase();
+    return `<article class="game" data-t="${esc(tags)}"><div class="sc"><div class="tm ${aw ? "" : "lose"}">${mark(g.away, "logo")}${esc(g.away.n)}${rc(g.recA)}</div><div class="num ${aw ? "" : "lose"}">${g.away.s}</div>
       <div class="tm ${aw ? "lose" : ""}">${mark(g.home, "logo")}${esc(g.home.n)}${rc(g.recH)}</div><div class="num ${aw ? "lose" : ""}">${g.home.s}</div></div>
       <div class="st"><span>${lg === "NFL" ? fmtDay(g.date) + " · " : ""}${g.pre ? "Preseason · " : ""}${esc(g.status)}</span>${g.id ? `<button class="link" data-open="${g.sport}:${esc(g.id)}">Game page · stats · video</button>` : ""}</div>
       <div class="strip" aria-hidden="true">${dots}</div><ul class="plays">${rows}</ul></article>`; }).join("");
 }
-const playRow = (p, teamName, attrs) => `<li><div class="pl"><span class="clock">${esc(p.clock)}</span>
+function applyFilters(){
+  const f = S.f.trim().toLowerCase(); let shown = 0, any = false;
+  document.querySelectorAll("#view .game").forEach(a => { any = true; const ok = !f || a.dataset.t.includes(f); a.hidden = !ok; if (ok) shown++;
+    a.querySelectorAll(".plays li[data-kind]").forEach(li => { li.hidden = S.kind !== "all" && li.dataset.kind !== S.kind && !(S.kind === "td" && li.dataset.kind === "td"); }); });
+  const n = $("nomatch"); if (n) n.hidden = !any || shown > 0;
+}
+function openWeeks(){
+  const ws = wkInfo(), cur = String(ws.some(w => String(w.k) === String(S.NFL)) ? S.NFL : (ws[0] || {}).k), groups = {};
+  ws.forEach(w => (groups[wkGroup(w.k)] = groups[wkGroup(w.k)] || []).push(w));
+  $("wkbody").innerHTML = ["Regular season", "Playoffs", "Preseason", "Games"].filter(g => groups[g]).map(g => `<div class="wkh">${g}</div><div class="wk">` +
+    groups[g].sort((a, b) => a.k - b.k).map(w => `<button type="button" data-wk="${w.k}" ${String(w.k) === cur ? 'aria-current="true"' : ""}><b>${esc(w.label)}</b><small>${w.games} games · ${w.tds} TD<br>${shortDay(w.from)}${w.to !== w.from ? " – " + shortDay(w.to) : ""}</small></button>`).join("") + `</div>`).join("") || `<p class="note" style="padding:1rem 1.25rem">No weeks saved yet.</p>`;
+  $("weeks").showModal();
+}
+const playRow = (p, teamName, attrs) => `<li data-kind="${esc(p.kind)}"><div class="pl"><span class="clock">${esc(p.clock)}</span>
   <span class="who"><b>${esc(p.who)}</b> · ${esc(teamName)}${p.kind === "fg" ? '<span class="tag">FG</span>' : ""}<small>${esc(p.type)} – ${esc(p.assist)}</small></span>
   <button class="play" ${attrs}>▶ Watch</button></div><div class="clip" hidden></div></li>`;
 const embed = p => { const e = p.embed;
   const m = !e ? `<div class="noclip">No embeddable clip for this play yet.</div>`
     : e.kind === "video" ? `<video src="${esc(e.src)}" controls autoplay playsinline></video>`
-    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">If the video box stays blank, use the link below.</p>`;
+    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">${p.ofGame ? "Couldn't find this exact play, so this is the game's highlight video. " : ""}If the video box stays blank, use the link below.</p>`;
   return m + (p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${p.exact ? "Open the clip in a new tab" : "Search for the clip"}</a>` : ""); };
 function toggleClip(btn, play, scope){
   const box = btn.closest("li").querySelector(".clip"), was = !box.hidden;
@@ -264,14 +307,34 @@ function toggleClip(btn, play, scope){
 }
 
 /* ---------- Standings tab ---------- */
+const NFL_DIVS = {"AFC East":["BUF","MIA","NE","NYJ"],"AFC North":["BAL","CIN","CLE","PIT"],"AFC South":["HOU","IND","JAX","TEN"],"AFC West":["DEN","KC","LV","LAC"],
+  "NFC East":["DAL","NYG","PHI","WSH"],"NFC North":["CHI","DET","GB","MIN"],"NFC South":["ATL","CAR","NO","TB"],"NFC West":["ARI","LAR","SF","SEA"]};
+function nflTable(){  /* worked out from every regular-season game saved on the site */
+  const T = {}, games = SAVED.filter(g => g.sport === "NFL" && g.wkn >= 200 && g.wkn < 300).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  games.forEach(g => [["away", "home"], ["home", "away"]].forEach(([me, op]) => { const t = g[me], ab = t.ab || t.n; if (!ab) return;
+    const r = T[ab] || (T[ab] = {ab, name:t.n, logo:t.logo, logoDark:t.logoDark, gp:0, w:0, l:0, t:0, pf:0, pa:0, res:[]});
+    const a = +t.s, b = +g[op].s; r.gp++; r.pf += a; r.pa += b; const x = a > b ? "W" : a < b ? "L" : "T"; r[x.toLowerCase()]++; r.res.push(x); }));
+  Object.values(T).forEach(r => { r.pct = r.gp ? (r.w + r.t / 2) / r.gp : 0; r.diff = r.pf - r.pa; let n = 0; const last = r.res[r.res.length - 1]; for (let i = r.res.length - 1; i >= 0 && r.res[i] === last; i--) n++; r.strk = last ? last + n : ""; });
+  return T;
+}
 function standingsView(){
-  if (!STAND) return `<div class="hd"><h2>NHL standings</h2></div><p class="note">Standings load with the nightly update. In GitHub, open <b>Actions</b>, choose <b>Update goals nightly</b> and click <b>Run workflow</b>.</p>`;
+  const seg = `<div class="seg"><button type="button" class="pill" data-stand="NHL" aria-pressed="${S.stand === "NHL"}">NHL</button><button type="button" class="pill" data-stand="NFL" aria-pressed="${S.stand === "NFL"}">NFL</button></div>`;
+  const th = cols => `<thead><tr><th></th><th>Team</th>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead>`;
+  if (S.stand === "NFL") {
+    const T = nflTable(); if (!Object.keys(T).length) return seg + `<div class="hd"><h2>NFL standings</h2></div><p class="note">No regular-season games saved yet. In GitHub, open <b>Actions</b>, choose <b>Update goals nightly</b> and click <b>Run workflow</b>.</p>`;
+    const row = (t, i) => `<tr><td>${i + 1}</td><td class="t">${mark(t)}${esc(t.name)}</td><td>${t.gp}</td><td>${t.w}</td><td>${t.l}</td><td>${t.t}</td><td class="p">${t.pct.toFixed(3).replace(/^0/, "")}</td><td>${t.pf}</td><td>${t.pa}</td><td>${t.diff > 0 ? "+" : ""}${t.diff}</td><td>${esc(t.strk)}</td></tr>`;
+    const sortT = (a, b) => b.pct - a.pct || b.diff - a.diff || b.pf - a.pf;
+    return seg + `<div class="hd"><h2>NFL standings</h2></div><p class="note" style="margin-top:-.4rem">Counted from the regular-season games on this site · updated each night</p>` +
+      ["AFC", "NFC"].map(c => `<h2>${c}</h2>` + Object.keys(NFL_DIVS).filter(d => d.startsWith(c)).map(d => { const l = NFL_DIVS[d].map(ab => T[ab]).filter(Boolean).sort(sortT);
+        return l.length ? `<h3>${d}</h3><div class="tw"><table class="st-t">${th(["GP", "W", "L", "T", "PCT", "PF", "PA", "DIFF", "STRK"])}<tbody>${l.map(row).join("")}</tbody></table></div>` : ""; }).join("")).join("");
+  }
+  if (!STAND) return seg + `<div class="hd"><h2>NHL standings</h2></div><p class="note">Standings load with the nightly update. In GitHub, open <b>Actions</b>, choose <b>Update goals nightly</b> and click <b>Run workflow</b>.</p>`;
   const conf = [["Eastern", ["Atlantic", "Metropolitan"]], ["Western", ["Central", "Pacific"]]];
   const row = (t, i) => `<tr><td>${i + 1}</td><td class="t">${mark(t)}${esc(t.name || t.ab)}</td><td>${t.gp}</td><td>${t.w}</td><td>${t.l}</td><td>${t.otl}</td><td class="p">${t.pts}</td>
     <td>${t.pp != null ? (+t.pp).toFixed(3).replace(/^0/, "") : ""}</td><td>${t.gf}</td><td>${t.ga}</td><td>${t.diff > 0 ? "+" : ""}${t.diff}</td><td>${esc(t.strk)}</td><td>${esc(t.l10)}</td></tr>`;
   const table = div => { const l = STAND.teams.filter(t => t.div === div).sort((a, b) => (a.seq || 99) - (b.seq || 99) || b.pts - a.pts || b.row - a.row);
-    return `<h3>${div} Division</h3><div class="tw"><table class="st-t"><thead><tr><th></th><th>Team</th><th>GP</th><th>W</th><th>L</th><th>OTL</th><th>PTS</th><th>P%</th><th>GF</th><th>GA</th><th>DIFF</th><th>STRK</th><th>L10</th></tr></thead><tbody>${l.map(row).join("")}</tbody></table></div>`; };
-  return `<div class="hd"><h2>NHL standings</h2></div><p class="note" style="margin-top:-.4rem">${STAND.date ? "As of " + fmtDay(STAND.date) + " · " : ""}${standLive ? "live from the NHL" : "updated each night"}</p>` +
+    return `<h3>${div} Division</h3><div class="tw"><table class="st-t">${th(["GP", "W", "L", "OTL", "PTS", "P%", "GF", "GA", "DIFF", "STRK", "L10"])}<tbody>${l.map(row).join("")}</tbody></table></div>`; };
+  return seg + `<div class="hd"><h2>NHL standings</h2></div><p class="note" style="margin-top:-.4rem">${STAND.date ? "As of " + fmtDay(STAND.date) + " · " : ""}${standLive ? "live from the NHL" : "updated each night"}</p>` +
     conf.map(([c, divs]) => `<h2>${c} Conference</h2>${divs.map(table).join("")}`).join("");
 }
 
@@ -338,10 +401,18 @@ const savedDetail = (lg, id) => { const g = SAVED.find(x => x.sport === lg && St
   let line = g.ls || null;
   if (!line && lg === "NHL") { const pn = c => /^OT/.test(c) ? 4 : (+(c.match(/^(\d)/) || [])[1] || 1), cols = Math.max(3, ...g.plays.map(p => pn(p.clock))); line = {cols:[], away:[], home:[]};
     for (let i = 0; i < cols; i++) { line.cols.push(i < 3 ? String(i + 1) : "OT"); line.away.push(g.plays.filter(p => pn(p.clock) - 1 === i && p.team === "away").length); line.home.push(g.plays.filter(p => pn(p.clock) - 1 === i && p.team === "home").length); } }
-  const vids = (g.vids || []).map(v => ({label:v.label, embed:{kind:"iframe", src:BC + v.id}, url:v.url})).concat((g.hl || []).map(v => ({label:v.label, embed:v.src ? {kind:"video", src:v.src} : null, url:v.url})));
+  const vids = (g.vids || []).map(v => ({label:v.label, embed:{kind:"iframe", src:BC + v.id}, url:v.url})).concat((g.hl || []).map(v => ({label:v.label, embed:v.yt ? {kind:"iframe", src:"https://www.youtube.com/embed/" + v.yt + "?autoplay=1&rel=0"} : v.src ? {kind:"video", src:v.src} : null, url:v.url})));
   return {league:lg, state:"final", detail:(g.pre ? "Preseason · " : "") + g.status, away:{ab:g.away.ab || g.away.n, name:g.away.n, logo:g.away.logo, logoDark:g.away.logoDark, s:g.away.s, rec:g.recA},
     home:{ab:g.home.ab || g.home.n, name:g.home.n, logo:g.home.logo, logoDark:g.home.logoDark, s:g.home.s, rec:g.recH}, plays:g.plays, line, stats:g.stats || [], vids, extra:"", offline:true}; };
 
+function mergeSaved(d, lg, id){  /* the nightly run finds the clips; the live page keeps them */
+  const sv = savedDetail(lg, id); if (!sv) return;
+  const g = SAVED.find(x => x.sport === lg && String(x.id) === String(id));
+  d.plays.forEach(p => { const m = g.plays.find(q => q.who === p.who && q.clock === p.clock) || g.plays.find(q => q.who === p.who);
+    if (m && m.embed && !p.embed) { p.embed = m.embed; p.url = m.url; p.exact = m.exact; if (m.ofGame) p.ofGame = true; } });
+  const have = new Set((d.vids || []).map(v => v.label)); d.vids = (sv.vids || []).filter(v => !have.has(v.label)).concat(d.vids || []);
+  if (!d.stats.length && sv.stats.length) d.stats = sv.stats;
+}
 const det = {key:null, timer:null, data:null, sig:"", vsig:"", open:null, vopen:null};
 async function openGame(key){
   det.key = key; det.data = null; det.sig = ""; det.vsig = ""; det.open = null; det.vopen = null;
@@ -352,7 +423,7 @@ async function pollGame(){
   clearTimeout(det.timer);
   const key = det.key; if (!key) return;
   const i = key.indexOf(":"), kind = key.slice(0, i), id = key.slice(i + 1);
-  try { const d = await (kind === "NHL" ? detNHL(id) : kind === "NHLE" ? detESPN("hockey/nhl", "NHL", id) : detESPN("football/nfl", "NFL", id)); if (det.key !== key) return; det.data = d; paintGame(); }
+  try { const d = await (kind === "NHL" ? detNHL(id) : kind === "NHLE" ? detESPN("hockey/nhl", "NHL", id) : detESPN("football/nfl", "NFL", id)); if (det.key !== key) return; if (kind === "NFL") { try { mergeSaved(d, "NFL", id); } catch (e) {} } det.data = d; paintGame(); }
   catch (e) { if (det.key !== key) return; if (!det.data) { det.data = savedDetail(kind === "NHLE" ? "NHL" : kind, id); if (det.data) paintGame(); else $("dhead").innerHTML = `<p class="note" style="padding:1rem 1.25rem">This game can't be loaded right now.</p>`; } }
   const st = det.data && det.data.state;  /* finished games are loaded once; live games refresh every 15s */
   if (det.key === key && (st === "live" || st === "pre")) det.timer = setTimeout(pollGame, st === "live" ? 15000 : 60000);
@@ -384,13 +455,21 @@ function closeGame(){ clearTimeout(det.timer); det.key = null; det.data = null; 
 function render(){
   document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.tab === tab));
   $("view").innerHTML = tab === "scores" ? scoresView() : tab === "standings" ? standingsView() : leagueView(tab);
+  if (tab === "NHL" || tab === "NFL") applyFilters();
 }
-document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.tab; render(); }));
+document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.tab; try { localStorage.setItem("sb_tab", tab); } catch (e) {} render(); window.scrollTo && window.scrollTo(0, 0); }));
 $("view").addEventListener("change", e => {
   if (e.target.id === "ssel") S.scores = e.target.value; else if (e.target.id === "lsel") S[tab] = e.target.value; else return;
   render();
 });
+$("view").addEventListener("input", e => { if (e.target.id === "tf") { S.f = e.target.value; applyFilters(); } });
 $("view").addEventListener("click", e => {
+  if (e.target.closest("#wkbtn")) { openWeeks(); return; }
+  const sg = e.target.closest("[data-stand]"); if (sg) { S.stand = sg.dataset.stand; try { localStorage.setItem("sb_stand", S.stand); } catch (x) {} render(); return; }
+  const kd = e.target.closest("button[data-kind]"); if (kd) { S.kind = kd.dataset.kind; render(); return; }
+  const nv = e.target.closest("[data-nav]"); if (nv && !nv.disabled) {
+    const list = tab === "NHL" ? savedDates("NHL") : nflWeeks().map(w => String(w.k)), c = list.includes(String(S[tab])) ? String(S[tab]) : list[0], j = list.indexOf(c) + +nv.dataset.nav;
+    if (list[j] != null) { S[tab] = list[j]; render(); } return; }
   const o = e.target.closest("[data-open]"); if (o) { openGame(o.dataset.open); return; }
   const b = e.target.closest(".play"); if (b && b.dataset.g != null) toggleClip(b, VIEW[+b.dataset.g].plays[+b.dataset.p], $("view"));
 });
@@ -402,6 +481,9 @@ $("game").addEventListener("click", e => {
   const b = e.target.closest(".play"); if (b && b.dataset.dp != null && det.data) { const i = +b.dataset.dp; det.open = toggleClip(b, det.data.plays[i], $("dplays")) ? i : null; }
 });
 $("closeGame").addEventListener("click", closeGame);
+$("closeWeeks").addEventListener("click", () => $("weeks").close());
+$("weeks").addEventListener("click", e => { if (e.target === $("weeks")) { $("weeks").close(); return; }
+  const b = e.target.closest("[data-wk]"); if (b) { S.NFL = b.dataset.wk; $("weeks").close(); render(); window.scrollTo && window.scrollTo(0, 0); } });
 $("game").addEventListener("close", () => { clearTimeout(det.timer); det.key = null; });
 
 SCORES = fallbackScores(); render(); loadLive(); loadStandings();
