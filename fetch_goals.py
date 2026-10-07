@@ -196,6 +196,36 @@ def nfl_heads(summary):
     return out
 
 
+ROSTER_CACHE = {}
+
+
+def nfl_roster_heads(team_id):
+    """name (lower case) -> headshot for a team's whole roster (ESPN's team roster list). Cached for the run."""
+    if team_id in ROSTER_CACHE:
+        return ROSTER_CACHE[team_id]
+    out = {}
+    try:
+        data = get(f"{ESPN_API}/teams/{team_id}/roster")
+
+        def walk(o):
+            if isinstance(o, dict):
+                name = o.get("displayName") or o.get("fullName")
+                if name and o.get("id"):
+                    hs = o.get("headshot")
+                    hs = hs.get("href") if isinstance(hs, dict) else hs
+                    out[name.lower()] = hs or f"https://a.espncdn.com/i/headshots/nfl/players/full/{o['id']}.png"
+                for v in o.values():
+                    walk(v)
+            elif isinstance(o, list):
+                for v in o:
+                    walk(v)
+        walk(data.get("athletes") or [])
+    except Exception as err:
+        print(f"    roster lookup failed for team {team_id}: {err}")
+    ROSTER_CACHE[team_id] = out
+    return out
+
+
 def nhl_goal_type(d, home_id):
     mod = d.get("goalModifier", "")
     if mod == "empty-net":
@@ -428,6 +458,9 @@ def parse_nfl_game(ev, date, prev=None):
 
     # the game's own highlight video, and whether this game is recent enough to look for every play separately
     heads = nfl_heads(summary)
+    for t in (away, home):  # the full rosters fill in anyone the box score missed (kickers, receivers...)
+        for k, v in nfl_roster_heads(t["id"]).items():
+            heads.setdefault(k, v)
     prev = prev or {}
     old_yt = next((h.get("yt") for h in prev.get("hl", []) if h.get("yt")), None)
     old_plays = {(p.get("who"), p.get("clock")): p for p in prev.get("plays", [])}
@@ -563,7 +596,7 @@ def nfl_season(days, end):
                     continue
                 old = have.get(str(ev["id"]))
                 # already saved and old enough that nothing will change: skip the slow lookups
-                if old and "hl" in old[1] and (last - datetime.strptime(date, "%Y-%m-%d")).days >= REFRESH_NIGHTS:
+                if old and "hl" in old[1] and (not old[1]["plays"] or any(p.get("img") for p in old[1]["plays"])) and (last - datetime.strptime(date, "%Y-%m-%d")).days >= REFRESH_NIGHTS:
                     continue
                 try:
                     game = parse_nfl_game(ev, date, old[1] if old else None)
