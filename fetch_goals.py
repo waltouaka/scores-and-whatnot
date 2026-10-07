@@ -162,6 +162,30 @@ def nhl_roster(pbp):
     return names
 
 
+def nhl_heads(pbp):
+    return {r.get("playerId"): r.get("headshot") for r in pbp.get("rosterSpots", []) if r.get("headshot")}
+
+
+def nfl_heads(summary):
+    """name (lower case) -> headshot link, for everyone in the game's box score and rosters."""
+    out = {}
+
+    def walk(o):
+        if isinstance(o, dict):
+            name = o.get("displayName") or o.get("fullName")
+            if name and o.get("id"):
+                hs = (o.get("headshot") or {}).get("href") if isinstance(o.get("headshot"), dict) else o.get("headshot")
+                out.setdefault(name.lower(), hs or f"https://a.espncdn.com/i/headshots/nfl/players/full/{o['id']}.png")
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    walk((summary.get("boxscore") or {}).get("players") or [])
+    walk(summary.get("rosters") or [])
+    return out
+
+
 def nhl_goal_type(d, home_id):
     mod = d.get("goalModifier", "")
     if mod == "empty-net":
@@ -221,6 +245,7 @@ def parse_nhl_game(game_id, date, sched=None):
     pbp = get(f"{NHL_API}/gamecenter/{game_id}/play-by-play")
     away, home = nhl_team(pbp["awayTeam"]), nhl_team(pbp["homeTeam"])
     names = nhl_roster(pbp)
+    heads = nhl_heads(pbp)
 
     last = pbp.get("gameOutcome", {}).get("lastPeriodType", "REG")
     status = {"OT": "Final / OT", "SO": "Final / SO"}.get(last, "Final")
@@ -256,6 +281,7 @@ def parse_nhl_game(game_id, date, sched=None):
             "t": round(minute_in_game, 1), "clock": f"{label} {int(mm)}:{ss}", "team": side,
             "who": who, "assist": ", ".join(a for a in assists if a) or "unassisted",
             "type": nhl_goal_type(d, home["id"]), "kind": "goal", "embed": embed, "url": url, "exact": exact,
+            **({"img": heads[d.get("scoringPlayerId")]} if heads.get(d.get("scoringPlayerId")) else {}),
         })
 
     stats, line = nhl_extras(game_id)
@@ -391,6 +417,7 @@ def parse_nfl_game(ev, date):
     used = set()
 
     # the game's own highlight video, and whether this game is recent enough to look for every play separately
+    heads = nfl_heads(summary)
     game_clip = yt_pick(f"{away['n']} {away['nick']} vs {home['n']} {home['nick']} highlights NFL {date[:4]}", [away["nick"], home["nick"]])
     used_yt = {game_clip["id"]} if game_clip else set()
     try:
@@ -412,6 +439,7 @@ def parse_nfl_game(ev, date):
         label = f"Q{p}" if p <= 4 else "OT"
 
         who, assist = split_td_text(sp.get("text", ""), ttext)
+        passer = (re.search(r"\bfrom ([A-Z][\w.'\- ]+?)(?: \(|$)", sp.get("text", "")) or [None, ""])[1].strip()
         if is_fg:
             assist = assist.replace("field Goal", "field goal")
         side = "home" if sp.get("team", {}).get("id") == home["id"] else "away"
@@ -440,6 +468,8 @@ def parse_nfl_game(ev, date):
             "who": who, "assist": assist, "type": "Field goal" if is_fg else (ttext.replace(" Touchdown", " TD") or "TD"),
             "kind": "fg" if is_fg else "td", "embed": embed,
             "url": url, "exact": exact, **({"ofGame": True} if of_game else {}),
+            **({"img": heads[who.lower()]} if heads.get(who.lower()) else {}),
+            **({"img2": heads[passer.lower()]} if passer and heads.get(passer.lower()) else {}),
         })
 
     wk, wkn = nfl_week(ev, date)
