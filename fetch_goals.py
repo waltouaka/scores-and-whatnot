@@ -8,6 +8,7 @@ Also saves the NHL standings and, for every game, team stats and game videos.
 Only uses Python's built-in libraries, so there is nothing to install.
 """
 import json
+import os
 import re
 import sys
 import time
@@ -51,6 +52,83 @@ def target_date():
 
 def search_link(text):
     return "https://www.youtube.com/results?search_query=" + urllib.parse.quote_plus(text)
+
+
+# ------------------------------------------------------------------ YouTube lookups (NFL clips)
+# ESPN does not list NFL clips, so we look for them on YouTube. With a free YOUTUBE_API_KEY (optional, set it as a
+# GitHub secret) the official search is used; without one we read the normal YouTube search page.
+YT_BUDGET = [400]  # most lookups per run, so a run can never drag on
+
+
+def _yt_scrape(query):
+    url = "https://www.youtube.com/results?sp=EgIQAQ%253D%253D&search_query=" + urllib.parse.quote_plus(query)
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+                                               "Accept-Language": "en-US,en;q=0.9", "Cookie": "CONSENT=YES+1; SOCS=CAI"})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        html = resp.read().decode("utf-8", "replace")
+    m = re.search(r"ytInitialData\s*=\s*(\{.*?\});\s*</script>", html, re.S)
+    if not m:
+        return []
+    out = []
+
+    def walk(o):
+        if isinstance(o, dict):
+            if "videoRenderer" in o and isinstance(o["videoRenderer"], dict):
+                v = o["videoRenderer"]
+                try:
+                    out.append({"id": v["videoId"], "title": "".join(r.get("text", "") for r in v["title"]["runs"]),
+                                "channel": "".join(r.get("text", "") for r in v.get("ownerText", {}).get("runs", []))})
+                except Exception:
+                    pass
+            for x in o.values():
+                walk(x)
+        elif isinstance(o, list):
+            for x in o:
+                walk(x)
+    walk(json.loads(m.group(1)))
+    return out
+
+
+def _yt_api(query, key):
+    url = ("https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=6&q="
+           + urllib.parse.quote_plus(query) + "&key=" + key)
+    return [{"id": i["id"]["videoId"], "title": i["snippet"]["title"], "channel": i["snippet"]["channelTitle"]}
+            for i in get(url).get("items", [])]
+
+
+def yt_results(query):
+    if YT_BUDGET[0] <= 0:
+        return []
+    YT_BUDGET[0] -= 1
+    key = os.environ.get("YOUTUBE_API_KEY", "").strip()
+    if key:
+        try:
+            return _yt_api(query, key)
+        except Exception as err:
+            print(f"    YouTube API failed ({err}); reading the search page instead")
+    try:
+        return _yt_scrape(query)
+    except Exception as err:
+        print(f"    YouTube search failed: {err}")
+        return []
+
+
+def yt_embeddable(video_id):
+    try:
+        get("https://www.youtube.com/oembed?format=json&url=" + urllib.parse.quote_plus("https://www.youtube.com/watch?v=" + video_id))
+        return True
+    except Exception:
+        return False
+
+
+def yt_pick(query, must, avoid=()):
+    """First result whose title mentions every word in `must` (and is allowed to be embedded). Official NFL uploads first."""
+    res = [r for r in yt_results(query) if r["id"] not in avoid and all(w.lower() in r["title"].lower() for w in must if w)]
+    res.sort(key=lambda r: ("nfl" not in r["channel"].lower(), "highlight" not in r["title"].lower()))
+    for r in res[:3]:
+        if yt_embeddable(r["id"]):
+            return {"id": r["id"], "title": r["title"]}
+    return None
 
 
 def city_name(place, common):
@@ -220,7 +298,7 @@ def nfl_team(c):
     logo = t.get("logo")
     return {
         "id": t.get("id"), "n": city_name(t.get("location", ""), t.get("name", "")) or t.get("displayName", ""),
-        "ab": t.get("abbreviation", ""),
+        "ab": t.get("abbreviation", ""), "nick": t.get("name", ""),
         "c": "#" + (t.get("color") or "7A8793"), "s": int(c.get("score") or 0),
         "logo": logo, "logoDark": logo.replace("/500/", "/500-dark/") if logo else None,
     }
@@ -312,6 +390,14 @@ def parse_nfl_game(ev, date):
     videos = list(summary.get("videos") or []) + list(summary.get("highlights") or []) + list(comp.get("highlights") or [])
     used = set()
 
+    # the game's own highlight video, and whether this game is recent enough to look for every play separately
+    game_clip = yt_pick(f"{away['n']} {away['nick']} vs {home['n']} {home['nick']} highlights NFL {date[:4]}", [away["nick"], home["nick"]])
+    used_yt = {game_clip["id"]} if game_clip else set()
+    try:
+        recent = (datetime.now() - datetime.strptime(date, "%Y-%m-%d")).days <= 10
+    except Exception:
+        recent = False
+
     plays = []
     for sp in summary.get("scoringPlays", []):
         ttext = sp.get("type", {}).get("text", "")
@@ -332,14 +418,28 @@ def parse_nfl_game(ev, date):
 
         url, mp4 = find_video(videos, who, used)
         exact = bool(url)
+        embed = {"kind": "video", "src": mp4} if mp4 else None
+        of_game = False
+        if not embed:
+            last = who.split()[-1] if who.split() else ""
+            clip = None
+            if recent and len(last) > 2:  # a clip of this exact play, found by player name
+                clip = yt_pick(f"{who} {'field goal' if is_fg else 'touchdown'} {away['nick']} {home['nick']} NFL", [last], avoid=used_yt)
+            if clip:
+                used_yt.add(clip["id"])
+            elif game_clip:
+                clip, of_game = game_clip, True  # otherwise the game's highlight video
+            if clip:
+                embed = {"kind": "iframe", "src": "https://www.youtube.com/embed/" + clip["id"] + "?autoplay=1&rel=0"}
+                url, exact = "https://www.youtube.com/watch?v=" + clip["id"], True
         if not url:
             url = search_link(f"{who} {'field goal' if is_fg else 'touchdown'} {away['n']} vs {home['n']} {date} NFL highlights")
 
         plays.append({
             "t": round(minute_in_game, 1), "clock": f"{label} {int(mm)}:{ss}", "team": side,
             "who": who, "assist": assist, "type": "Field goal" if is_fg else (ttext.replace(" Touchdown", " TD") or "TD"),
-            "kind": "fg" if is_fg else "td", "embed": {"kind": "video", "src": mp4} if mp4 else None,
-            "url": url, "exact": exact,
+            "kind": "fg" if is_fg else "td", "embed": embed,
+            "url": url, "exact": exact, **({"ofGame": True} if of_game else {}),
         })
 
     wk, wkn = nfl_week(ev, date)
@@ -349,6 +449,8 @@ def parse_nfl_game(ev, date):
         href, mp4 = video_links(v)
         if (href or mp4) and len(hl) < 3 and (href, mp4) not in [(x["url"], x["src"]) for x in hl]:
             hl.append({"label": v.get("headline") or "Highlights", "src": mp4, "url": href})
+    if game_clip:
+        hl.insert(0, {"label": "Game highlights", "yt": game_clip["id"], "url": "https://www.youtube.com/watch?v=" + game_clip["id"], "src": None})
     ls = {}
     for side in ("away", "home"):
         c = next((x for x in comp["competitors"] if x["homeAway"] == side), {})
@@ -358,6 +460,7 @@ def parse_nfl_game(ev, date):
 
     for t in (away, home):
         t.pop("id", None)
+        t.pop("nick", None)
     game = {"sport": "NFL", "id": str(ev["id"]), "date": date, "wk": wk, "wkn": wkn,
             "status": status, "away": away, "home": home, "plays": plays, "stats": stats, "hl": hl}
     if line:
