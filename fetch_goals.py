@@ -483,6 +483,55 @@ def nfl_games(date):
     return games
 
 
+def et_date(iso):
+    """ESPN gives a UTC time like 2026-10-05T00:15Z; the site files games under the US Eastern calendar day."""
+    dt = datetime.strptime(iso.replace("Z", "")[:16], "%Y-%m-%dT%H:%M")
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import timezone
+        return dt.replace(tzinfo=timezone.utc).astimezone(ZoneInfo("America/Toronto")).strftime("%Y-%m-%d")
+    except Exception:
+        return (dt - timedelta(hours=4)).strftime("%Y-%m-%d")
+
+
+def nfl_season(days, end):
+    """Every finished NFL game, fetched a whole WEEK at a time (Thursday to Monday), so no game is missed."""
+    year = SEASON_START[:4]
+    last = datetime.strptime(end, "%Y-%m-%d")
+    have = {g["id"]: (d, g) for d, gl in days.items() for g in gl if g.get("sport") == "NFL"}
+    added = failed = 0
+    for stype, weeks in ((2, range(1, 19)), (3, range(1, 6))):
+        for wk in weeks:
+            try:
+                board = get(f"{ESPN_API}/scoreboard?dates={year}&seasontype={stype}&week={wk}")
+            except Exception as err:
+                print(f"  NFL week {wk} (type {stype}) lookup failed: {err}")
+                failed += 1
+                continue
+            for ev in board.get("events", []):
+                if not ev.get("status", {}).get("type", {}).get("completed"):
+                    continue
+                date = et_date(ev["date"])
+                if date > end:
+                    continue
+                old = have.get(str(ev["id"]))
+                # already saved and old enough that nothing will change: skip the slow lookups
+                if old and "hl" in old[1] and (last - datetime.strptime(date, "%Y-%m-%d")).days >= REFRESH_NIGHTS:
+                    continue
+                try:
+                    game = parse_nfl_game(ev, date)
+                except Exception as err:
+                    print(f"  NFL game {ev.get('id')} skipped: {err}")
+                    continue
+                if old:
+                    days[old[0]] = [g for g in days[old[0]] if not (g.get("sport") == "NFL" and g.get("id") == game["id"])]
+                days.setdefault(date, []).append(game)
+                have[game["id"]] = (date, game)
+                added += 1
+                print(f"  NFL {game['away']['n']} at {game['home']['n']}: {len(game['plays'])} scoring plays ({game['wk']})")
+    return added, failed
+
+
 # ------------------------------------------------------------------ main
 
 def fetch_standings():
@@ -527,7 +576,7 @@ def load_days():
 
 def fetch_day(date):
     games, failed = [], False
-    for label, fn in (("NHL", nhl_games), ("NFL", nfl_games)):
+    for label, fn in (("NHL", nhl_games),):  # football is fetched week by week (nfl_season)
         try:
             games += fn(date)
         except Exception as err:
@@ -561,6 +610,12 @@ def main():
             continue
         days[date] = games
         ok += 1
+
+    try:
+        added, bad_weeks = nfl_season(days, end)
+        print(f"NFL: {added} games saved or refreshed" + (f" ({bad_weeks} weeks failed)" if bad_weeks else ""))
+    except Exception as err:
+        print(f"NFL season lookup failed: {err}")
 
     try:
         standings = fetch_standings()
