@@ -160,7 +160,7 @@ body{background:radial-gradient(1100px 480px at 8% -8%,var(--glow),transparent 6
 const NHL_API = "https://api-web.nhle.com/v1";
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports";
 const ESPN_NFL = ESPN + "/football/nfl", ESPN_NHL = ESPN + "/hockey/nhl";
-const BC = "https://players.brightcove.net/6415718365001/EXtG1xJ7H_default/index.html?autoplay=true&videoId=";
+const BC = "https://players.brightcove.net/6415718365001/EXtG1xJ7H_default/index.html?videoId=";
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const ytSearch = q => "https://www.youtube.com/results?search_query=" + encodeURIComponent(q);
@@ -362,7 +362,7 @@ const embed = p => { const e = p.embed;
   const card = `<div class="pcard">${faces}<div class="tx"><b>${esc(p.who)}</b><small>${esc(p.type)} – ${esc(p.assist)}</small>${p.sc ? `<span class="after">${esc(p.clock)} · ${esc(p.sc)}</span>` : `<span class="after">${esc(p.clock)}</span>`}</div>${link}</div>`;
   if (!e) return card + `<div class="finds-row">${findLinks(p)}</div>`;
   const m = e.kind === "video" ? `<video src="${esc(e.src)}" controls autoplay playsinline></video>`
-    : `<iframe class="${/platform\.twitter\.com/.test(e.src) ? "tw" : ""}" src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">If the video box stays blank, use the button above.</p>`;
+    : `<iframe class="${/platform\.twitter\.com/.test(e.src) ? "tw" : ""}" src="${esc(e.src)}" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="origin"></iframe><p class="hint">Stuck loading? <a href="${esc(p.url || e.src)}" target="_blank" rel="noopener">Open the clip in a new tab</a>.</p>`;
   return card + m + (hasVideo ? "" : `<div class="finds-row">${findLinks(p)}</div>`); };
 function fillHeads(root){
   (root || document).querySelectorAll(".hs[data-hs]").forEach(el => {
@@ -398,7 +398,7 @@ function toggleClip(btn, play, scope){
   const box = btn.closest("li").querySelector(".clip"), was = !box.hidden;
   scope.querySelectorAll(".clip").forEach(c => { c.hidden = true; c.innerHTML = ""; });
   if (was) return false;
-  box.innerHTML = embed(play); box.hidden = false; fillHeads(box); return true;
+  box.hidden = false; box.innerHTML = embed(play); fillHeads(box); return true;
 }
 
 /* ---------- Standings tab ---------- */
