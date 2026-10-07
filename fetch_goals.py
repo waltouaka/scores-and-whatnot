@@ -1,7 +1,8 @@
-"""Fetch last night's NHL goals and NFL touchdowns and write data.js for the website.
+"""Fetch NHL goals and NFL touchdowns/field goals and save them in data.js for the website.
 
-Run it:   python fetch_goals.py            (uses yesterday's date)
-          python fetch_goals.py 2026-10-05 (uses a specific date)
+Run it:   python fetch_goals.py            (fills in every missing night since SEASON_START,
+                                            and refreshes the last few nights)
+          python fetch_goals.py 2026-10-05 (just that one night)
 
 Only uses Python's built-in libraries, so there is nothing to install.
 """
@@ -144,7 +145,8 @@ def parse_nhl_game(game_id, date):
 
     for t in (away, home):
         t.pop("id", None)
-    return {"sport": "NHL", "status": status, "away": away, "home": home, "plays": plays}
+    return {"sport": "NHL", "id": str(game_id), "date": date, "pre": pbp.get("gameType") == 1,
+            "status": status, "away": away, "home": home, "plays": plays}
 
 
 def nhl_games(date):
@@ -153,6 +155,8 @@ def nhl_games(date):
     for g in schedule.get("games", []):
         if g.get("gameState") not in ("FINAL", "OFF"):
             continue  # skip games that are not finished
+        if g.get("gameDate") not in (None, date):
+            continue  # the feed can include the next night's games too
         try:
             game = parse_nhl_game(g["id"], date)
             games.append(game)
@@ -198,10 +202,31 @@ def find_video(videos, who, used):
             href = links.get("web", {}).get("href")
             src = links.get("source", {})
             mp4 = (src.get("HD") or src.get("full") or links.get("mobile", {}).get("source") or {}).get("href")
+            if mp4 and ".mp4" not in mp4.lower():
+                mp4 = None  # only plain video files can play inside the page
             if href or mp4:
                 used.add(i)
                 return href, mp4
     return None, None
+
+
+NFL_WEEK1 = "2026-09-10"  # only used if ESPN leaves the week number out
+
+
+def nfl_week(ev, date):
+    """('Week 4', 204): a label for the page plus a number to sort weeks by."""
+    n = (ev.get("week") or {}).get("number")
+    t = (ev.get("season") or {}).get("type") or 2
+    if not n:
+        n = max(1, (datetime.strptime(date, "%Y-%m-%d") - datetime.strptime(NFL_WEEK1, "%Y-%m-%d")).days // 7 + 1)
+        t = 2
+    if t == 1:
+        label = f"Preseason {n}"
+    elif t == 3:
+        label = {1: "Wild Card", 2: "Divisional", 3: "Conference Championship", 5: "Super Bowl"}.get(n, "Playoffs")
+    else:
+        label = f"Week {n}"
+    return label, t * 100 + n
 
 
 def parse_nfl_game(ev, date):
@@ -246,7 +271,9 @@ def parse_nfl_game(ev, date):
 
     for t in (away, home):
         t.pop("id", None)
-    return {"sport": "NFL", "status": status, "away": away, "home": home, "plays": plays}
+    wk, wkn = nfl_week(ev, date)
+    return {"sport": "NFL", "id": str(ev["id"]), "date": date, "wk": wk, "wkn": wkn,
+            "status": status, "away": away, "home": home, "plays": plays}
 
 
 def nfl_games(date):
@@ -258,7 +285,7 @@ def nfl_games(date):
         try:
             game = parse_nfl_game(ev, date)
             games.append(game)
-            print(f"  NFL {game['away']['n']} at {game['home']['n']}: {len(game['plays'])} touchdowns")
+            print(f"  NFL {game['away']['n']} at {game['home']['n']}: {len(game['plays'])} scoring plays ({game['wk']})")
         except Exception as err:
             print(f"  NFL game {ev.get('id')} skipped: {err}")
     return games
@@ -266,7 +293,8 @@ def nfl_games(date):
 
 # ------------------------------------------------------------------ main
 
-SEASON_START = "2026-09-01"  # the first run fills in every night from here
+SEASON_START = "2026-09-01"  # the first run fills in every night from here to yesterday
+REFRESH_NIGHTS = 3           # recent nights are re-checked each run, because clips post late
 
 
 def load_days():
@@ -278,7 +306,7 @@ def load_days():
                     return json.loads(line[len("window.DAYS = "):].strip().rstrip(";"))
     except Exception:
         pass
-    return {}
+    return {}  # no file yet, or the old format: start the whole season over
 
 
 def fetch_day(date):
@@ -295,35 +323,39 @@ def fetch_day(date):
 def main():
     end = target_date()
     days = load_days()
-    one_day = len(sys.argv) > 1
-    if one_day:
-        start = end
-    elif days:  # normal nightly run: refresh the last two nights (clips can post late)
-        start = (datetime.strptime(end, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
-    else:       # first run: fill in the whole season so far
-        start = SEASON_START
-
-    latest_failed = False
-    d = datetime.strptime(start, "%Y-%m-%d")
     last = datetime.strptime(end, "%Y-%m-%d")
-    while d <= last:
-        date = d.strftime("%Y-%m-%d")
+
+    if len(sys.argv) > 1:
+        todo = [end]
+    else:
+        todo, d = [], datetime.strptime(SEASON_START, "%Y-%m-%d")
+        while d <= last:
+            date = d.strftime("%Y-%m-%d")
+            # nights with no games are saved as empty, so only truly missing nights get looked up
+            if date not in days or (last - d).days < REFRESH_NIGHTS:
+                todo.append(date)
+            d += timedelta(days=1)
+
+    ok = bad = 0
+    for date in todo:
         print(f"Looking up {date} ...")
         games, failed = fetch_day(date)
-        if games:
-            days[date] = games
-        if failed and date == end:
-            latest_failed = True
-        d += timedelta(days=1)
+        if failed:
+            bad += 1  # keep any older copy; this night is tried again next run
+            continue
+        days[date] = games
+        ok += 1
 
-    latest = max(days) if days else end
+    latest = max((d for d, g in days.items() if g), default=end)
     with open("data.js", "w", encoding="utf-8") as f:
         f.write(f"window.LIVE_DATE = {json.dumps(latest)};\n")
         f.write("window.DAYS = " + json.dumps(days, separators=(",", ":")) + ";\n")
+    nights = sum(1 for g in days.values() if g)
     total = sum(len(g["plays"]) for day in days.values() for g in day)
-    print(f"Done: {len(days)} nights, {total} scoring plays saved in data.js")
-    if latest_failed:
-        sys.exit(1)  # makes the nightly job report a problem
+    print(f"Done: {nights} nights with games, {total} scoring plays saved in data.js"
+          + (f" ({bad} nights failed and will be retried)" if bad else ""))
+    if bad and not ok:
+        sys.exit(1)  # nothing worked at all (feeds down?): make the nightly job show a red X
 
 
 if __name__ == "__main__":
