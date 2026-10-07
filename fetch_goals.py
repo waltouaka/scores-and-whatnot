@@ -8,6 +8,7 @@ Only uses Python's built-in libraries, so there is nothing to install.
 import json
 import re
 import sys
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta
@@ -29,6 +30,7 @@ NHL_COLORS = {
 
 
 def get(url):
+    time.sleep(0.15)  # be polite to the free APIs
     req = urllib.request.Request(url, headers={"User-Agent": "goal-site/0.2"})
     with urllib.request.urlopen(req, timeout=20) as resp:
         return json.load(resp)
@@ -264,24 +266,64 @@ def nfl_games(date):
 
 # ------------------------------------------------------------------ main
 
-def main():
-    date = target_date()
-    print(f"Looking up games for {date} ...")
+SEASON_START = "2026-09-01"  # the first run fills in every night from here
+
+
+def load_days():
+    """Read the nights saved by earlier runs, so history keeps growing."""
+    try:
+        with open("data.js", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("window.DAYS = "):
+                    return json.loads(line[len("window.DAYS = "):].strip().rstrip(";"))
+    except Exception:
+        pass
+    return {}
+
+
+def fetch_day(date):
     games, failed = [], False
     for label, fn in (("NHL", nhl_games), ("NFL", nfl_games)):
         try:
             games += fn(date)
         except Exception as err:
             failed = True
-            print(f"{label} lookup failed: {err}")
+            print(f"{label} lookup failed for {date}: {err}")
+    return games, failed
 
+
+def main():
+    end = target_date()
+    days = load_days()
+    one_day = len(sys.argv) > 1
+    if one_day:
+        start = end
+    elif days:  # normal nightly run: refresh the last two nights (clips can post late)
+        start = (datetime.strptime(end, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    else:       # first run: fill in the whole season so far
+        start = SEASON_START
+
+    latest_failed = False
+    d = datetime.strptime(start, "%Y-%m-%d")
+    last = datetime.strptime(end, "%Y-%m-%d")
+    while d <= last:
+        date = d.strftime("%Y-%m-%d")
+        print(f"Looking up {date} ...")
+        games, failed = fetch_day(date)
+        if games:
+            days[date] = games
+        if failed and date == end:
+            latest_failed = True
+        d += timedelta(days=1)
+
+    latest = max(days) if days else end
     with open("data.js", "w", encoding="utf-8") as f:
-        f.write(f"window.LIVE_DATE = {json.dumps(date)};\n")
-        f.write(f"window.LIVE_GAMES = {json.dumps(games, indent=1)};\n")
-    total = sum(len(g["plays"]) for g in games)
-    print(f"Done: {len(games)} games, {total} scoring plays written to data.js")
-    if failed:
-        sys.exit(1)  # makes the nightly job report a problem instead of publishing partial data
+        f.write(f"window.LIVE_DATE = {json.dumps(latest)};\n")
+        f.write("window.DAYS = " + json.dumps(days, separators=(",", ":")) + ";\n")
+    total = sum(len(g["plays"]) for day in days.values() for g in day)
+    print(f"Done: {len(days)} nights, {total} scoring plays saved in data.js")
+    if latest_failed:
+        sys.exit(1)  # makes the nightly job report a problem
 
 
 if __name__ == "__main__":
