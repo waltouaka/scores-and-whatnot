@@ -83,6 +83,7 @@ dialog::backdrop{background:rgba(0,0,0,.8)}
 .pill:hover{border-color:var(--ink)}
 .pill[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .pill:disabled{opacity:.35;cursor:default}
+.wkrow{display:flex;gap:.4rem;overflow-x:auto;width:100%;padding-bottom:.4rem}.wkrow .pill{flex:none}
 .seg{display:flex;gap:.4rem;margin-bottom:.8rem}
 .wk{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.5rem;padding:0 1.25rem 1rem}
 .wk button{text-align:left;background:var(--paper2);color:var(--ink);border:1px solid var(--line);padding:.55rem .7rem;cursor:pointer}
@@ -259,7 +260,8 @@ function leagueView(lg){
     list = ws.map(w => String(w.k)); cur = list.includes(String(S.NFL)) ? String(S.NFL) : list[0];
     games = SAVED.filter(g => g.sport === "NFL" && String(g.wkn || 0) === cur).sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
     const w = ws.find(x => String(x.k) === cur);
-    nav = `<button type="button" class="pill" id="wkbtn" aria-haspopup="dialog">${esc(w ? w.label : "Week")} ▾ all weeks</button>`;
+    const wi = wkInfo().sort((a, b) => a.k - b.k), short = x => { const n = (String(x.label).match(/\d+/) || [])[0]; return wkGroup(x.k) === "Regular season" && n ? "Wk " + n : x.label; };
+    nav = `<h3 style="margin:0;width:100%;font-size:1rem;color:var(--muted)">PICK A WEEK</h3><div class="wkrow" role="group" aria-label="Weeks">${wi.map(x => `<button type="button" class="pill" data-wk="${x.k}" aria-pressed="${String(x.k) === cur}">${esc(short(x))}</button>`).join("")}</div>`;
   }
   const i = list.indexOf(cur), arrows = `<button type="button" class="pill" data-nav="1" ${i >= list.length - 1 ? "disabled" : ""} aria-label="Earlier">‹ Earlier</button><button type="button" class="pill" data-nav="-1" ${i <= 0 ? "disabled" : ""} aria-label="Later">Later ›</button>`;
   VIEW = games;
@@ -465,6 +467,7 @@ $("view").addEventListener("change", e => {
 $("view").addEventListener("input", e => { if (e.target.id === "tf") { S.f = e.target.value; applyFilters(); } });
 $("view").addEventListener("click", e => {
   if (e.target.closest("#wkbtn")) { openWeeks(); return; }
+  const wb = e.target.closest(".wkrow [data-wk]"); if (wb) { S.NFL = wb.dataset.wk; render(); return; }
   const sg = e.target.closest("[data-stand]"); if (sg) { S.stand = sg.dataset.stand; try { localStorage.setItem("sb_stand", S.stand); } catch (x) {} render(); return; }
   const kd = e.target.closest("button[data-kind]"); if (kd) { S.kind = kd.dataset.kind; render(); return; }
   const nv = e.target.closest("[data-nav]"); if (nv && !nv.disabled) {
