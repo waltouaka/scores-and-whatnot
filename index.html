@@ -77,6 +77,13 @@ dialog::backdrop{background:rgba(0,0,0,.8)}
 .stats td:nth-child(2){color:var(--muted);font:500 .95rem var(--b)}
 .dsub{font:800 1.3rem var(--d);padding:.4rem 1.25rem}
 .vb{display:flex;flex-wrap:wrap;gap:.5rem;padding:0 1.25rem .8rem}
+.pcard{display:flex;align-items:center;gap:.8rem;background:#000;border:1px solid var(--line);padding:.8rem 1rem;margin-bottom:.5rem;flex-wrap:wrap}
+.hs{width:64px;height:64px;border-radius:50%;object-fit:cover;object-position:top;background:var(--paper2);border:2px solid var(--line);flex:none;display:inline-flex;align-items:center;justify-content:center;font:800 1.3rem var(--d);color:var(--muted)}
+.hs+.hs{margin-left:-1.4rem}
+.pcard .tx{flex:1;min-width:10rem}.pcard .tx b{font:800 1.4rem/1.1 var(--d);display:block}.pcard .tx small{color:var(--muted)}
+.big{display:inline-block;background:var(--goal);color:#fff;font:700 1.1rem var(--d);letter-spacing:.04em;padding:.5rem 1.1rem;border-radius:999px;text-decoration:none;border:0;cursor:pointer}
+.big:hover{filter:brightness(1.15)}
+.ghost{background:none;border:1px solid var(--line);color:var(--muted);font:600 .85rem var(--b);padding:.3rem .8rem;border-radius:999px;cursor:pointer;margin-left:.4rem}
 .tools{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin-bottom:1rem}
 .tools input{font:500 1rem var(--b);padding:.45rem .7rem;background:var(--paper2);color:var(--ink);border:1px solid var(--line);border-radius:6px;min-width:11rem}
 .pill{font:700 1rem var(--d);letter-spacing:.04em;background:var(--paper2);color:var(--ink);border:1px solid var(--line);border-radius:999px;padding:.3rem .95rem;cursor:pointer}
@@ -296,11 +303,18 @@ function openWeeks(){
 const playRow = (p, teamName, attrs) => `<li data-kind="${esc(p.kind)}"><div class="pl"><span class="clock">${esc(p.clock)}</span>
   <span class="who"><b>${esc(p.who)}</b> · ${esc(teamName)}${p.kind === "fg" ? '<span class="tag">FG</span>' : ""}<small>${esc(p.type)} – ${esc(p.assist)}</small></span>
   <button class="play" ${attrs}>▶ Watch</button></div><div class="clip" hidden></div></li>`;
+const ini = n => String(n || "?").split(/\s+/).map(x => x[0]).slice(0, 2).join("").toUpperCase();
+const face = (src, name) => src ? `<img class="hs" src="${esc(src)}" alt="${esc(name)}" onerror="this.style.visibility='hidden'">` : `<span class="hs" aria-hidden="true">${esc(ini(name))}</span>`;
+const isYT = e => e && /youtube\.com\/embed/.test(e.src || "");
 const embed = p => { const e = p.embed;
-  const m = !e ? `<div class="noclip">No embeddable clip for this play yet.</div>`
-    : e.kind === "video" ? `<video src="${esc(e.src)}" controls autoplay playsinline></video>`
-    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">${p.ofGame ? "Couldn't find this exact play, so this is the game's highlight video. " : ""}If the video box stays blank, use the link below.</p>`;
-  return m + (p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${p.exact ? "Open the clip in a new tab" : "Search for the clip"}</a>` : ""); };
+  /* player card: headshot + what happened + a button for the video */
+  const faces = face(p.img, p.who) + (p.img2 ? face(p.img2, "") : "");
+  const link = p.url ? `<a class="big" href="${esc(p.url)}" target="_blank" rel="noopener">${isYT(e) ? "▶ Watch on YouTube" : p.exact ? "▶ Open the clip" : "🔍 Search for the clip"}</a>` : "";
+  const card = `<div class="pcard">${faces}<div class="tx"><b>${esc(p.who)}</b><small>${esc(p.type)} – ${esc(p.assist)}</small>${p.ofGame ? `<small style="display:block">Game highlights video (exact play not found)</small>` : ""}</div>${link}${isYT(e) ? `<button type="button" class="ghost" data-try="${esc(e.src)}">Try playing here</button>` : ""}</div>`;
+  if (isYT(e) || !e) return card + (!e && !p.url ? `<div class="noclip">No clip for this play yet.</div>` : "");
+  const m = e.kind === "video" ? `<video src="${esc(e.src)}" controls autoplay playsinline></video>`
+    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">If the video box stays blank, use the button above.</p>`;
+  return card + m; };
 function toggleClip(btn, play, scope){
   const box = btn.closest("li").querySelector(".clip"), was = !box.hidden;
   scope.querySelectorAll(".clip").forEach(c => { c.hidden = true; c.innerHTML = ""; });
@@ -349,7 +363,7 @@ const NFL_STATS = [["firstDowns","1st downs"],["totalYards","Total yards"],["net
 const vidId = v => { const m = String(v == null ? "" : typeof v === "object" ? (v.id || v.videoId || "") : v).match(/(\d{8,})/); return m ? m[1] : null; };
 async function detNHL(id){
   const [p, rr] = await Promise.all([getJ(`${NHL_API}/gamecenter/${id}/play-by-play`), getJ(`${NHL_API}/gamecenter/${id}/right-rail`).catch(() => null)]);
-  const nm = {}; (p.rosterSpots || []).forEach(r => nm[r.playerId] = ((r.firstName || {}).default || "").slice(0, 1) + ". " + ((r.lastName || {}).default || ""));
+  const nm = {}, hd = {}; (p.rosterSpots || []).forEach(r => hd[r.playerId] = r.headshot, nm[r.playerId] = ((r.firstName || {}).default || "").slice(0, 1) + ". " + ((r.lastName || {}).default || ""));
   const A = p.awayTeam, H = p.homeTeam, st = {LIVE:"live", CRIT:"live", FINAL:"final", OFF:"final"}[p.gameState] || "pre";
   const lastT = (p.gameOutcome || {}).lastPeriodType || (p.periodDescriptor || {}).periodType, ck = p.clock || {};
   const detail = st === "live" ? per(p.periodDescriptor) + " " + (ck.inIntermission ? "intermission" : String(ck.timeRemaining || "").replace(/^0/, ""))
@@ -359,7 +373,7 @@ async function detNHL(id){
     const d = e.details || {}, pd = e.periodDescriptor || {}, n = pd.number || 1, who = nm[d.scoringPlayerId] || "Own goal";
     const as = [d.assist1PlayerId, d.assist2PlayerId].filter(Boolean).map(i => nm[i]).filter(Boolean), cid = d.highlightClip || vidId(d.highlightClipSharingUrl);
     return {clock: (pd.periodType === "OT" ? "OT" : per(pd)) + " " + String(e.timeInPeriod || "0:00").replace(/^0/, ""), per:n, team: d.eventOwnerTeamId === H.id ? "home" : "away",
-      who, assist: as.join(", ") || "unassisted", type: goalType(d, e, H.id), kind:"goal", embed: cid ? {kind:"iframe", src: BC + cid} : null,
+      who, img: hd[d.scoringPlayerId], assist: as.join(", ") || "unassisted", type: goalType(d, e, H.id), kind:"goal", embed: cid ? {kind:"iframe", src: BC + cid} : null,
       url: d.highlightClipSharingUrl || ytSearch(`${who} goal ${A.abbrev || ""} ${H.abbrev || ""}`), exact: !!d.highlightClipSharingUrl}; });
   let line = null;
   if (st !== "pre") { const cols = Math.max(3, ...plays.map(x => x.per)); line = {cols:[], away:[], home:[]};
@@ -380,6 +394,7 @@ async function detESPN(path, league, id){
   const s = await getJ(`${ESPN}/${path}/summary?event=${id}`), comp = ((s.header || {}).competitions || [])[0]; if (!comp) throw new Error("no game");
   const t = comp.status.type, cs = comp.competitors, home = cs.find(c => c.homeAway === "home"), away = cs.find(c => c.homeAway === "away"), hockey = league === "NHL";
   const tm = c => { const l = c.team.logo || ((c.team.logos || [])[0] || {}).href; return {ab:c.team.abbreviation, name:c.team.displayName, logo:l, logoDark:l && l.replace("/500/", "/500-dark/"), s:c.score, rec:recOf(c), id:String(c.team.id)}; };
+  const heads = {}; (function walk(o){ if (Array.isArray(o)) o.forEach(walk); else if (o && typeof o === "object") { const n = o.displayName || o.fullName; if (n && o.id) heads[n.toLowerCase()] = (o.headshot && o.headshot.href) || `https://a.espncdn.com/i/headshots/nfl/players/full/${o.id}.png`; Object.values(o).forEach(walk); } })((s.boxscore || {}).players || []);
   const st = {in:"live", post:"final"}[t.state] || "pre", used = new Set(), videos = [].concat(s.videos || [], s.highlights || []);
   const plays = (s.scoringPlays || []).map(sp => {
     const tt = (sp.type || {}).text || "", low = tt.toLowerCase(), p = (sp.period || {}).number || 1, clk = ((sp.clock || {}).displayValue) || "0:00", txt = String(sp.text || "");
@@ -388,7 +403,8 @@ async function detESPN(path, league, id){
       return {clock: (p > 3 ? "OT" : ["", "1st", "2nd", "3rd"][p]) + " " + clk, per:p, team:side, who, assist: txt.slice(who.length).trim() || tt, type: tt || "Goal", kind:"goal", embed:null,
         url: ytSearch(`${who} goal ${away.team.abbreviation} ${home.team.abbreviation} NHL highlights`), exact:false}; }
     const td = low.includes("touchdown"), fg = low.includes("field goal"), [who, as] = splitTd(txt, tt), [href, mp4] = nflVideo(videos, who, used);
-    return {clock: (p <= 4 ? "Q" + p : "OT") + " " + clk, per:p, team:side, who, assist: fg ? as.replace("field Goal", "field goal") : as, type: fg ? "Field goal" : td ? tt.replace(" Touchdown", " TD") : tt, kind: fg ? "fg" : td ? "td" : "other",
+    const pm = txt.match(/\bfrom ([A-Z][\w.'\- ]+?)(?: \(|$)/), im = n => n && heads[n.toLowerCase()];
+    return {clock: (p <= 4 ? "Q" + p : "OT") + " " + clk, per:p, team:side, who, img: im(who), img2: pm && im(pm[1].trim()), assist: fg ? as.replace("field Goal", "field goal") : as, type: fg ? "Field goal" : td ? tt.replace(" Touchdown", " TD") : tt, kind: fg ? "fg" : td ? "td" : "other",
       embed: mp4 ? {kind:"video", src:mp4} : null, url: href || ytSearch(`${who} ${fg ? "field goal" : "touchdown"} ${away.team.abbreviation} ${home.team.abbreviation} NFL highlights`), exact: !!href}; });
   const ls = c => (c.linescores || []).map(x => x.displayValue != null ? x.displayValue : x.value), la = ls(away), lh = ls(home), n = Math.max(la.length, lh.length);
   const line = n && st !== "pre" ? {cols: Array.from({length:n}, (_, i) => hockey ? (i < 3 ? String(i + 1) : "OT") : (i < 4 ? "Q" + (i + 1) : "OT")), away:la, home:lh} : null;
@@ -411,6 +427,7 @@ function mergeSaved(d, lg, id){  /* the nightly run finds the clips; the live pa
   const sv = savedDetail(lg, id); if (!sv) return;
   const g = SAVED.find(x => x.sport === lg && String(x.id) === String(id));
   d.plays.forEach(p => { const m = g.plays.find(q => q.who === p.who && q.clock === p.clock) || g.plays.find(q => q.who === p.who);
+    if (m && m.img && !p.img) p.img = m.img; if (m && m.img2 && !p.img2) p.img2 = m.img2;
     if (m && m.embed && !p.embed) { p.embed = m.embed; p.url = m.url; p.exact = m.exact; if (m.ofGame) p.ofGame = true; } });
   const have = new Set((d.vids || []).map(v => v.label)); d.vids = (sv.vids || []).filter(v => !have.has(v.label)).concat(d.vids || []);
   if (!d.stats.length && sv.stats.length) d.stats = sv.stats;
@@ -473,11 +490,13 @@ $("view").addEventListener("click", e => {
   const nv = e.target.closest("[data-nav]"); if (nv && !nv.disabled) {
     const list = tab === "NHL" ? savedDates("NHL") : nflWeeks().map(w => String(w.k)), c = list.includes(String(S[tab])) ? String(S[tab]) : list[0], j = list.indexOf(c) + +nv.dataset.nav;
     if (list[j] != null) { S[tab] = list[j]; render(); } return; }
+  const tr = e.target.closest("[data-try]"); if (tr) { tr.closest(".clip").insertAdjacentHTML("beforeend", `<iframe src="${esc(tr.dataset.try)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">If it says the video is unavailable, the owner blocked embedding. Use the YouTube button.</p>`); tr.remove(); return; }
   const o = e.target.closest("[data-open]"); if (o) { openGame(o.dataset.open); return; }
   const b = e.target.closest(".play"); if (b && b.dataset.g != null) toggleClip(b, VIEW[+b.dataset.g].plays[+b.dataset.p], $("view"));
 });
 $("game").addEventListener("click", e => {
   if (e.target === $("game")) { closeGame(); return; }
+  const tr = e.target.closest("[data-try]"); if (tr) { tr.closest(".clip").insertAdjacentHTML("beforeend", `<iframe src="${esc(tr.dataset.try)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">If it says the video is unavailable, the owner blocked embedding. Use the YouTube button.</p>`); tr.remove(); return; }
   const v = e.target.closest("[data-dv]");
   if (v && det.data) { const i = +v.dataset.dv, box = $("dvbox"), vd = det.data.vids[i];
     if (det.vopen === i) { box.hidden = true; box.innerHTML = ""; det.vopen = null; } else { box.innerHTML = embed({embed:vd.embed, url:vd.url, exact:true}); box.hidden = false; det.vopen = i; } return; }
@@ -493,4 +512,4 @@ SCORES = fallbackScores(); render(); loadLive(); loadStandings();
 setInterval(loadLive, 30000); setInterval(loadStandings, 300000);
 </script>
 </body>
-</html>
+</html> 
