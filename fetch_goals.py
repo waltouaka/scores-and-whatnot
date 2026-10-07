@@ -4,6 +4,7 @@ Run it:   python fetch_goals.py            (fills in every missing night since S
                                             and refreshes the last few nights)
           python fetch_goals.py 2026-10-05 (just that one night)
 
+Also saves the NHL standings and, for every game, team stats and game videos.
 Only uses Python's built-in libraries, so there is nothing to install.
 """
 import json
@@ -67,7 +68,7 @@ def nhl_team(t):
     place = t.get("placeName", {}).get("default", "")
     common = t.get("commonName", {}).get("default", "")
     return {
-        "id": t.get("id"), "n": city_name(place, common) or abbrev,
+        "id": t.get("id"), "n": city_name(place, common) or abbrev, "ab": abbrev,
         "c": NHL_COLORS.get(abbrev, "#7A8793"), "s": t.get("score", 0),
         "logo": t.get("logo") or f"https://assets.nhle.com/logos/nhl/svg/{abbrev}_light.svg",
         "logoDark": t.get("darkLogo") or f"https://assets.nhle.com/logos/nhl/svg/{abbrev}_dark.svg",
@@ -102,7 +103,43 @@ def nhl_goal_type(d, home_id):
     return "Goal"
 
 
-def parse_nhl_game(game_id, date):
+NHL_STAT_NAMES = {"sog": "Shots on goal", "faceoffWinningPctg": "Faceoff win %", "powerPlay": "Power play",
+                  "pim": "Penalty minutes", "hits": "Hits", "blockedShots": "Blocked shots",
+                  "giveaways": "Giveaways", "takeaways": "Takeaways"}
+
+
+def nhl_extras(game_id):
+    """Team stats + line score from the right-rail feed. Never fails the whole game."""
+    stats, line = [], None
+    try:
+        rr = get(f"{NHL_API}/gamecenter/{game_id}/right-rail")
+        for item in rr.get("teamGameStats", []):
+            label = NHL_STAT_NAMES.get(item.get("category"))
+            if not label:
+                continue
+            a, h = item.get("awayValue"), item.get("homeValue")
+            if item["category"] == "faceoffWinningPctg":
+                a, h = f"{round(float(a) * 100)}%", f"{round(float(h) * 100)}%"
+            stats.append([label, str(a), str(h)])
+        by = (rr.get("linescore") or {}).get("byPeriod") or []
+        if by:
+            cols = []
+            for p in by:
+                d = p.get("periodDescriptor", {})
+                cols.append("SO" if d.get("periodType") == "SO" else "OT" if d.get("periodType") == "OT" else str(d.get("number")))
+            line = {"cols": cols, "away": [p.get("away", 0) for p in by], "home": [p.get("home", 0) for p in by]}
+    except Exception as err:
+        print(f"    (no team stats for NHL game {game_id}: {err})")
+    return stats, line
+
+
+def video_id(path):
+    m = re.search(r"(\d{8,})$", str(path or ""))
+    return m.group(1) if m else None
+
+
+def parse_nhl_game(game_id, date, sched=None):
+    sched = sched or {}
     pbp = get(f"{NHL_API}/gamecenter/{game_id}/play-by-play")
     away, home = nhl_team(pbp["awayTeam"]), nhl_team(pbp["homeTeam"])
     names = nhl_roster(pbp)
@@ -133,7 +170,7 @@ def parse_nhl_game(game_id, date):
         exact = bool(url)
         if not url:
             url = search_link(f"{who} goal {away['n']} vs {home['n']} {date}")
-        clip_id = d.get("highlightClip")
+        clip_id = d.get("highlightClip") or video_id(d.get("highlightClipSharingUrl"))
         embed = ({"kind": "iframe", "src": f"https://players.brightcove.net/6415718365001/EXtG1xJ7H_default/index.html?videoId={clip_id}"}
                  if clip_id else None)
 
@@ -143,10 +180,20 @@ def parse_nhl_game(game_id, date):
             "type": nhl_goal_type(d, home["id"]), "kind": "goal", "embed": embed, "url": url, "exact": exact,
         })
 
+    stats, line = nhl_extras(game_id)
+    vids = []
+    for label, key in (("Game recap", "threeMinRecap"), ("Condensed game", "condensedGame")):
+        vid = video_id(sched.get(key))
+        if vid:
+            vids.append({"label": label, "id": vid, "url": "https://www.nhl.com" + sched[key]})
+
     for t in (away, home):
         t.pop("id", None)
-    return {"sport": "NHL", "id": str(game_id), "date": date, "pre": pbp.get("gameType") == 1,
-            "status": status, "away": away, "home": home, "plays": plays}
+    game = {"sport": "NHL", "id": str(game_id), "date": date, "pre": pbp.get("gameType") == 1,
+            "status": status, "away": away, "home": home, "plays": plays, "stats": stats, "vids": vids}
+    if line:
+        game["ls"] = line
+    return game
 
 
 def nhl_games(date):
@@ -158,7 +205,7 @@ def nhl_games(date):
         if g.get("gameDate") not in (None, date):
             continue  # the feed can include the next night's games too
         try:
-            game = parse_nhl_game(g["id"], date)
+            game = parse_nhl_game(g["id"], date, g)
             games.append(game)
             print(f"  NHL {game['away']['n']} at {game['home']['n']}: {len(game['plays'])} goals")
         except Exception as err:
@@ -173,6 +220,7 @@ def nfl_team(c):
     logo = t.get("logo")
     return {
         "id": t.get("id"), "n": city_name(t.get("location", ""), t.get("name", "")) or t.get("displayName", ""),
+        "ab": t.get("abbreviation", ""),
         "c": "#" + (t.get("color") or "7A8793"), "s": int(c.get("score") or 0),
         "logo": logo, "logoDark": logo.replace("/500/", "/500-dark/") if logo else None,
     }
@@ -229,6 +277,30 @@ def nfl_week(ev, date):
     return label, t * 100 + n
 
 
+NFL_STAT_NAMES = [("firstDowns", "1st downs"), ("totalYards", "Total yards"), ("netPassingYards", "Passing yards"),
+                  ("rushingYards", "Rushing yards"), ("thirdDownEff", "3rd down"), ("fourthDownEff", "4th down"),
+                  ("turnovers", "Turnovers"), ("totalPenaltiesYards", "Penalties-yards"), ("possessionTime", "Possession"),
+                  ("sacksYardsLost", "Sacked-yards"), ("yardsPerPlay", "Yards per play"), ("redZoneAttempts", "Red zone")]
+
+
+def nfl_stats(summary, away_id, home_id):
+    by = {}
+    for tm in (summary.get("boxscore") or {}).get("teams", []):
+        by[str((tm.get("team") or {}).get("id"))] = {x.get("name"): x.get("displayValue") for x in tm.get("statistics", [])}
+    a, h = by.get(str(away_id), {}), by.get(str(home_id), {})
+    return [[label, str(a.get(k, "-")), str(h.get(k, "-"))] for k, label in NFL_STAT_NAMES if k in a or k in h]
+
+
+def video_links(v):
+    links = v.get("links", {})
+    href = links.get("web", {}).get("href")
+    src = links.get("source", {})
+    mp4 = (src.get("HD") or src.get("full") or links.get("mobile", {}).get("source") or {}).get("href")
+    if mp4 and ".mp4" not in mp4.lower():
+        mp4 = None
+    return href, mp4
+
+
 def parse_nfl_game(ev, date):
     comp = ev["competitions"][0]
     teams = {c["homeAway"]: nfl_team(c) for c in comp["competitors"]}
@@ -236,7 +308,8 @@ def parse_nfl_game(ev, date):
     status = ev.get("status", {}).get("type", {}).get("detail", "Final").replace("/", " / ")
 
     summary = get(f"{ESPN_API}/summary?event={ev['id']}")
-    videos = summary.get("videos", [])
+    # every video ESPN lists for this game, from any of the places it puts them
+    videos = list(summary.get("videos") or []) + list(summary.get("highlights") or []) + list(comp.get("highlights") or [])
     used = set()
 
     plays = []
@@ -269,11 +342,27 @@ def parse_nfl_game(ev, date):
             "url": url, "exact": exact,
         })
 
+    wk, wkn = nfl_week(ev, date)
+    stats = nfl_stats(summary, away["id"], home["id"])
+    hl = []
+    for v in videos:
+        href, mp4 = video_links(v)
+        if (href or mp4) and len(hl) < 3 and (href, mp4) not in [(x["url"], x["src"]) for x in hl]:
+            hl.append({"label": v.get("headline") or "Highlights", "src": mp4, "url": href})
+    ls = {}
+    for side in ("away", "home"):
+        c = next((x for x in comp["competitors"] if x["homeAway"] == side), {})
+        ls[side] = [int(float(x.get("value") or 0)) for x in c.get("linescores", [])]
+    line = ({"cols": [f"Q{i + 1}" if i < 4 else "OT" for i in range(len(ls["away"]))], "away": ls["away"], "home": ls["home"]}
+            if ls["away"] and len(ls["away"]) == len(ls["home"]) else None)
+
     for t in (away, home):
         t.pop("id", None)
-    wk, wkn = nfl_week(ev, date)
-    return {"sport": "NFL", "id": str(ev["id"]), "date": date, "wk": wk, "wkn": wkn,
-            "status": status, "away": away, "home": home, "plays": plays}
+    game = {"sport": "NFL", "id": str(ev["id"]), "date": date, "wk": wk, "wkn": wkn,
+            "status": status, "away": away, "home": home, "plays": plays, "stats": stats, "hl": hl}
+    if line:
+        game["ls"] = line
+    return game
 
 
 def nfl_games(date):
@@ -293,20 +382,44 @@ def nfl_games(date):
 
 # ------------------------------------------------------------------ main
 
+def fetch_standings():
+    data = get(f"{NHL_API}/standings/now")
+    teams = []
+    for t in data.get("standings", []):
+        streak = f"{t.get('streakCode', '')}{t.get('streakCount', '')}"
+        teams.append({
+            "ab": (t.get("teamAbbrev") or {}).get("default", ""), "name": (t.get("teamName") or {}).get("default", ""),
+            "logo": t.get("teamLogo"), "logoDark": t.get("teamLogoDark"),
+            "conf": t.get("conferenceName"), "div": t.get("divisionName"), "seq": t.get("divisionSequence"),
+            "gp": t.get("gamesPlayed"), "w": t.get("wins"), "l": t.get("losses"), "otl": t.get("otLosses"),
+            "pts": t.get("points"), "pp": t.get("pointPctg"), "row": t.get("regulationPlusOtWins"),
+            "gf": t.get("goalFor"), "ga": t.get("goalAgainst"), "diff": t.get("goalDifferential"),
+            "strk": streak, "l10": f"{t.get('l10Wins', 0)}-{t.get('l10Losses', 0)}-{t.get('l10OtLosses', 0)}",
+        })
+    date = next((t.get("date") for t in data.get("standings", []) if t.get("date")), None)
+    return {"date": date, "teams": teams}
+
+
 SEASON_START = "2026-09-01"  # the first run fills in every night from here to yesterday
 REFRESH_NIGHTS = 3           # recent nights are re-checked each run, because clips post late
 
 
-def load_days():
-    """Read the nights saved by earlier runs, so history keeps growing."""
+def load_var(name):
+    """Read one saved value back out of data.js (None if it isn't there)."""
+    prefix = f"window.{name} = "
     try:
         with open("data.js", encoding="utf-8") as f:
             for line in f:
-                if line.startswith("window.DAYS = "):
-                    return json.loads(line[len("window.DAYS = "):].strip().rstrip(";"))
+                if line.startswith(prefix):
+                    return json.loads(line[len(prefix):].strip().rstrip(";"))
     except Exception:
         pass
-    return {}  # no file yet, or the old format: start the whole season over
+    return None
+
+
+def load_days():
+    """Read the nights saved by earlier runs, so history keeps growing."""
+    return load_var("DAYS") or {}  # no file yet, or the old format: start the whole season over
 
 
 def fetch_day(date):
@@ -346,9 +459,17 @@ def main():
         days[date] = games
         ok += 1
 
+    try:
+        standings = fetch_standings()
+        print(f"Standings saved: {len(standings['teams'])} teams")
+    except Exception as err:
+        print(f"Standings lookup failed: {err}")
+        standings = load_var("STANDINGS")  # keep the last good copy
+
     latest = max((d for d, g in days.items() if g), default=end)
     with open("data.js", "w", encoding="utf-8") as f:
         f.write(f"window.LIVE_DATE = {json.dumps(latest)};\n")
+        f.write("window.STANDINGS = " + json.dumps(standings, separators=(",", ":")) + ";\n")
         f.write("window.DAYS = " + json.dumps(days, separators=(",", ":")) + ";\n")
     nights = sum(1 for g in days.values() if g)
     total = sum(len(g["plays"]) for day in days.values() for g in day)
