@@ -17,8 +17,6 @@ button:focus-visible,a:focus-visible{outline:3px solid var(--goal);outline-offse
 #tabs{display:flex;gap:.25rem}
 #tabs button{font:700 1.25rem var(--d);letter-spacing:.04em;color:#9FB0C2;background:none;border:0;border-bottom:4px solid transparent;padding:.4rem 1rem .5rem;cursor:pointer}
 #tabs button[aria-pressed="true"]{color:#fff;border-color:var(--goal)}
-.ticker{display:flex;gap:1px;overflow-x:auto;background:#16273D;border-top:1px solid #1E3350;scrollbar-width:thin}
-.tk{flex:none;display:grid;grid-template-columns:auto auto;gap:0 .6rem;padding:.35rem .9rem;background:#0F1E32;font:700 1rem/1.25 var(--d);min-width:7.5rem}
 .tk small{grid-column:1/3;font:500 .75rem var(--b);color:#9FB0C2}
 .wrap{max-width:1000px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
 h2{font:800 1.7rem/1 var(--d);margin:1.5rem 0 .7rem}
@@ -51,6 +49,8 @@ h2{font:800 1.7rem/1 var(--d);margin:1.5rem 0 .7rem}
 .clip{padding:0 1.25rem 1rem}.clip video,.clip iframe{width:100%;aspect-ratio:16/9;border:0;background:#05090F;display:block;margin-bottom:.4rem}
 .noclip{padding:1.5rem;background:#05090F;color:#9FB0C2;margin-bottom:.4rem}
 .clip a{color:var(--ink);font-size:.9rem}
+.hd{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;margin-bottom:1rem}
+.hd select{font:600 1rem var(--b);padding:.4rem .6rem;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:6px}
 .tot{display:flex;gap:2.2rem;border-bottom:2px solid var(--ink);padding-bottom:.9rem;margin-bottom:1.2rem}
 .tot b{display:block;font:800 2.6rem/1 var(--d)}.tot span{color:var(--muted);font-size:.9rem}
 @media (max-width:520px){.pl{grid-template-columns:3rem 1fr}.pl .play{grid-column:2;justify-self:start}}
@@ -60,13 +60,16 @@ h2{font:800 1.7rem/1 var(--d);margin:1.5rem 0 .7rem}
 <header class="top">
   <div class="bar"><h1>Scoreboard</h1>
     <nav id="tabs"><button data-tab="scores">Scores</button><button data-tab="NHL">NHL</button><button data-tab="NFL">NFL</button></nav></div>
-  <div class="ticker" id="ticker"></div>
 </header>
 <main class="wrap" id="view"></main>
 <script src="data.js"></script>
 <script>
-const GAMES = window.LIVE_GAMES || [];
-let SCORES = [], feedOk = false, tab = "scores";
+const DAYS = window.DAYS || {};
+const LATEST = DAYS[Object.keys(DAYS).sort().pop()] || [];
+let GAMES = LATEST, SCORES = [], feedOk = false, tab = "scores";
+const SEL = {};
+const fmt = x => new Date(x + "T12:00:00").toLocaleDateString(undefined, {weekday:"short", month:"short", day:"numeric"});
+const datesFor = lg => Object.keys(DAYS).filter(d => DAYS[d].some(g => g.sport === lg)).sort().reverse();
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const mark = t => t.logo ? `<picture>${t.logoDark ? `<source media="(prefers-color-scheme: dark)" srcset="${esc(t.logoDark)}">` : ""}<img class="logo" src="${esc(t.logo)}" alt="" onerror="this.style.visibility='hidden'"></picture>` : "";
@@ -91,27 +94,28 @@ async function loadLive(){
   try { if (a.status === "fulfilled") out.push(...a.value.games.map(nhlS)); } catch(e){}
   try { if (b.status === "fulfilled") out.push(...b.value.events.map(nflS)); } catch(e){}
   feedOk = a.status === "fulfilled" || b.status === "fulfilled";
-  SCORES = out.length ? out : GAMES.map(finalOf);
-  ticker(); if (tab === "scores") render();
+  SCORES = out.length ? out : LATEST.map(finalOf);
+  if (tab === "scores") render();
 }
 
 /* ---- views ---- */
 const sd = (t, g, other) => { const lose = g.state === "final" && +t.s < +other.s;
   return `<div class="sd ${lose ? "l" : ""}">${mark(t)}<b>${esc(t.ab)}</b><span>${g.state === "pre" ? "" : esc(t.s ?? "")}</span></div>`; };
 const tile = g => `<div class="tile ${g.state}"><div class="meta"><span>${g.league}</span><span>${g.state === "live" ? '<i class="dot"></i>' : ""}${esc(g.detail)}</span></div>${sd(g.away, g, g.home)}${sd(g.home, g, g.away)}</div>`;
-function ticker(){ $("ticker").innerHTML = SCORES.map(g => `<div class="tk"><small>${g.league} · ${esc(g.detail)}</small><span>${esc(g.away.ab)}</span><span>${g.state==="pre"?"":esc(g.away.s)}</span><span>${esc(g.home.ab)}</span><span>${g.state==="pre"?"":esc(g.home.s)}</span></div>`).join(""); }
 function scoresView(){
   const body = [["Live now","live"],["Final","final"],["Upcoming","pre"]].map(([t, s]) => { const l = SCORES.filter(g => g.state === s);
     return l.length ? `<h2>${t}</h2><div class="grid">${l.map(tile).join("")}</div>` : ""; }).join("");
   return (feedOk ? "" : `<p class="note">The live feed isn't reachable right now, so this shows the last saved results.</p>`) + (body || `<p class="note">No games found.</p>`);
 }
 function leagueView(lg){
+  const ds = datesFor(lg), d = ds.includes(SEL[lg]) ? SEL[lg] : ds[0];
+  if (!d) return `<p class="note">No ${lg} games saved yet.</p>`;
+  GAMES = DAYS[d];
   const games = GAMES.filter(g => g.sport === lg), plays = games.flatMap(g => g.plays);
-  if (!games.length) return `<p class="note">No ${lg} games saved for last night.</p>`;
+  const nav = `<select id="dsel" aria-label="Choose a night">${ds.map(x => `<option value="${x}" ${x === d ? "selected" : ""}>${fmt(x)}</option>`).join("")}</select>`;
   const fg = plays.filter(p => p.kind === "fg").length, main = plays.length - fg;
-  const when = window.LIVE_DATE ? new Date(window.LIVE_DATE + "T12:00:00").toLocaleDateString(undefined, {weekday:"long", month:"long", day:"numeric"}) : "";
   const tot = `<div class="tot"><div><b>${games.length}</b><span>games</span></div><div><b>${main}</b><span>${lg === "NHL" ? "goals" : "touchdowns"}</span></div>${lg === "NFL" ? `<div><b>${fg}</b><span>field goals</span></div>` : ""}</div>`;
-  return `<h2 style="margin-top:0">${lg} results${when ? " · " + when : ""}</h2>${tot}` + games.map(g => {
+  return `<div class="hd"><h2 style="margin:0">${lg} results</h2>${nav}</div>${tot}` + games.map(g => {
     const aw = +g.away.s > +g.home.s, gi = GAMES.indexOf(g), total = Math.max(60, ...g.plays.map(p => p.t + 1));
     const dots = g.plays.map(p => `<i class="${p.kind === "fg" ? "fg" : ""}" style="left:${(p.t / total * 100).toFixed(1)}%" title="${esc(p.clock + " " + p.who)}"></i>`).join("");
     const rows = g.plays.map((p, pi) => `<li><div class="pl"><span class="clock">${esc(p.clock)}</span>
@@ -131,6 +135,7 @@ const embed = p => { const e = p.embed;
     : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
   return m + `<a href="${esc(p.url)}" target="_blank" rel="noopener">${p.exact ? "Open the clip in a new tab" : "Search for the clip"}</a>`; };
 
+$("view").addEventListener("change", e => { if (e.target.id === "dsel") { SEL[tab] = e.target.value; render(); } });
 document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.tab; render(); }));
 $("view").addEventListener("click", e => {
   const b = e.target.closest(".play"); if (!b) return;
@@ -139,7 +144,7 @@ $("view").addEventListener("click", e => {
   if (wasOpen) return;
   box.innerHTML = embed(GAMES[+b.dataset.g].plays[+b.dataset.p]); box.hidden = false;
 });
-SCORES = GAMES.map(finalOf); ticker(); render(); loadLive(); setInterval(loadLive, 30000);
+SCORES = LATEST.map(finalOf); render(); loadLive(); setInterval(loadLive, 30000);
 </script>
 </body>
 </html>
