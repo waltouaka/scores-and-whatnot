@@ -309,11 +309,11 @@ const isYT = e => e && /youtube\.com\/embed/.test(e.src || "");
 const embed = p => { const e = p.embed;
   /* player card: headshot + what happened + a button for the video */
   const faces = face(p.img, p.who) + (p.img2 ? face(p.img2, "") : "");
-  const link = p.url ? `<a class="big" href="${esc(p.url)}" target="_blank" rel="noopener">${isYT(e) ? "▶ Watch on YouTube" : p.exact ? "▶ Open the clip" : "🔍 Search for the clip"}</a>` : "";
-  const card = `<div class="pcard">${faces}<div class="tx"><b>${esc(p.who)}</b><small>${esc(p.type)} – ${esc(p.assist)}</small>${p.ofGame ? `<small style="display:block">Game highlights video (exact play not found)</small>` : ""}</div>${link}${isYT(e) ? `<button type="button" class="ghost" data-try="${esc(e.src)}">Try playing here</button>` : ""}</div>`;
-  if (isYT(e) || !e) return card + (!e && !p.url ? `<div class="noclip">No clip for this play yet.</div>` : "");
+  const link = p.url ? `<a class="big" href="${esc(p.url)}" target="_blank" rel="noopener">${isYT(e) ? "↗ Open on YouTube" : p.exact ? "↗ Open the clip" : "🔍 Search for the clip"}</a>` : "";
+  const card = `<div class="pcard">${faces}<div class="tx"><b>${esc(p.who)}</b><small>${esc(p.type)} – ${esc(p.assist)}</small>${p.ofGame ? `<small style="display:block">Game highlights video (exact play not found)</small>` : ""}</div>${link}</div>`;
+  if (!e) return card + (!e && !p.url ? `<div class="noclip">No clip for this play yet.</div>` : "");
   const m = e.kind === "video" ? `<video src="${esc(e.src)}" controls autoplay playsinline></video>`
-    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">If the video box stays blank, use the button above.</p>`;
+    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe><p class="hint">${isYT(e) ? "If it says the video is unavailable, the owner blocked embedding. " : "If the video box stays blank, "}use the button above.</p>`;
   return card + m; };
 function toggleClip(btn, play, scope){
   const box = btn.closest("li").querySelector(".clip"), was = !box.hidden;
@@ -512,4 +512,4 @@ SCORES = fallbackScores(); render(); loadLive(); loadStandings();
 setInterval(loadLive, 30000); setInterval(loadStandings, 300000);
 </script>
 </body>
-</html> 
+</html>
