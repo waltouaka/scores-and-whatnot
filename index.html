@@ -3,226 +3,143 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Last Night's Scoring</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<title>Scoreboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{
-  --ice:#EAF0F4; --paper:#F8FAFB; --ink:#0E1B2C; --muted:#5B6B7C; --line:#C9D4DD;
-  --goal:#E4262C; --turf:#1F6B4A;
-  --display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
-  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
-}
-@media (prefers-color-scheme:dark){
-  :root{ --ice:#0B1420; --paper:#121E2D; --ink:#E8EEF3; --muted:#94A4B4; --line:#25364A; }
-}
-*{box-sizing:border-box}
-html{scroll-padding-top:1rem}
-body{margin:0;background:var(--ice);color:var(--ink);font:400 16px/1.5 var(--body)}
-.wrap{max-width:880px;margin:0 auto;padding:2rem 1.25rem 4rem}
-header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1.5rem}
-h1{font:800 clamp(2.6rem,8vw,4.6rem)/.92 var(--display);margin:0;letter-spacing:-.01em}
-.date{color:var(--muted);margin:.5rem 0 0}
-.tabs{display:flex;gap:.25rem;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:.25rem}
-.tabs button{font:700 1.1rem var(--display);letter-spacing:.04em;border:0;background:none;color:var(--muted);padding:.35rem 1.1rem;border-radius:999px;cursor:pointer}
-.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
-button:focus-visible,summary:focus-visible{outline:3px solid var(--goal);outline-offset:2px}
-.totals{display:flex;gap:2.5rem;padding:1rem 0 1.25rem;border-bottom:2px solid var(--ink);margin-bottom:1.5rem}
-.totals b{display:block;font:800 3rem/1 var(--display)}
-.totals span{color:var(--muted);font-size:.9rem}
+:root{--ice:#E9EEF3;--paper:#fff;--ink:#0E1B2C;--muted:#5B6B7C;--line:#CBD5DE;--bar:#0A1626;--goal:#E4262C;--live:#E4262C;
+--d:"Barlow Condensed","Arial Narrow",Impact,sans-serif;--b:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){:root{--ice:#0B1420;--paper:#121E2D;--ink:#E8EEF3;--muted:#94A4B4;--line:#25364A}}
+*{box-sizing:border-box}body{margin:0;background:var(--ice);color:var(--ink);font:400 16px/1.5 var(--b)}
+button:focus-visible,a:focus-visible{outline:3px solid var(--goal);outline-offset:2px}
+.top{background:var(--bar);color:#fff}
+.bar{max-width:1000px;margin:0 auto;padding:.9rem 1.25rem 0;display:flex;flex-wrap:wrap;align-items:flex-end;gap:.5rem 2rem}
+.bar h1{font:800 2rem/1 var(--d);margin:0 0 .6rem;letter-spacing:.01em}
+#tabs{display:flex;gap:.25rem}
+#tabs button{font:700 1.25rem var(--d);letter-spacing:.04em;color:#9FB0C2;background:none;border:0;border-bottom:4px solid transparent;padding:.4rem 1rem .5rem;cursor:pointer}
+#tabs button[aria-pressed="true"]{color:#fff;border-color:var(--goal)}
+.ticker{display:flex;gap:1px;overflow-x:auto;background:#16273D;border-top:1px solid #1E3350;scrollbar-width:thin}
+.tk{flex:none;display:grid;grid-template-columns:auto auto;gap:0 .6rem;padding:.35rem .9rem;background:#0F1E32;font:700 1rem/1.25 var(--d);min-width:7.5rem}
+.tk small{grid-column:1/3;font:500 .75rem var(--b);color:#9FB0C2}
+.wrap{max-width:1000px;margin:0 auto;padding:1.5rem 1.25rem 4rem}
+h2{font:800 1.7rem/1 var(--d);margin:1.5rem 0 .7rem}
+.note{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.75rem}
+.tile{background:var(--paper);border:1px solid var(--line);padding:.6rem .8rem}
+.tile.live{border-left:4px solid var(--live)}
+.meta{display:flex;justify-content:space-between;color:var(--muted);font-size:.8rem;margin-bottom:.3rem}
+.dot{display:inline-block;width:.55rem;height:.55rem;border-radius:50%;background:var(--live);margin-right:.35rem;animation:p 1.4s infinite}
+@keyframes p{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.dot{animation:none}}
+.sd{display:flex;align-items:center;gap:.6rem;font:700 1.4rem/1.5 var(--d)}
+.sd b{flex:1;font-weight:700}.sd.l{opacity:.55}
+.logo{width:1.8rem;height:1.8rem;object-fit:contain;flex:none}
 .game{background:var(--paper);border:1px solid var(--line);margin-bottom:1.25rem}
-.score{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.25rem 1rem;padding:1rem 1.25rem .5rem}
-.team{display:flex;align-items:center;gap:.7rem;font:700 1.7rem/1.1 var(--display)}
-.chip{width:.7rem;height:1.6rem;border-radius:2px;flex:none}
-.logo{width:2.3rem;height:2.3rem;object-fit:contain;flex:none}
-.num{font:800 2.6rem/1 var(--display);text-align:right;min-width:2ch}
-.team.lose,.num.lose{opacity:.55}
-.status{padding:0 1.25rem;color:var(--muted);font-size:.85rem}
-.strip{position:relative;height:26px;margin:.6rem 1.25rem 1rem;border-bottom:2px solid var(--line)}
-.strip i{position:absolute;bottom:-7px;width:12px;height:12px;border-radius:50%;border:2px solid var(--ink);transform:translateX(-50%);background:var(--c)}
-.strip u{position:absolute;bottom:-2px;width:1px;height:8px;background:var(--line)}
+.sc{display:grid;grid-template-columns:1fr auto;align-items:center;gap:.1rem 1rem;padding:1rem 1.25rem .4rem}
+.tm{display:flex;align-items:center;gap:.7rem;font:700 1.7rem/1.1 var(--d)}.tm .logo{width:2.4rem;height:2.4rem}
+.num{font:800 2.6rem/1 var(--d);text-align:right}.lose{opacity:.55}
+.st{padding:0 1.25rem;color:var(--muted);font-size:.85rem}
+.strip{position:relative;height:24px;margin:.6rem 1.25rem 1rem;border-bottom:2px solid var(--line)}
+.strip i{position:absolute;bottom:-7px;width:12px;height:12px;border-radius:50%;border:2px solid var(--ink);transform:translateX(-50%);background:var(--ink)}
+.strip i.fg{background:var(--paper);width:10px;height:10px}
 .plays{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
-.plays li{display:grid;grid-template-columns:3.6rem 1fr auto;gap:.75rem;align-items:center;padding:.7rem 1.25rem;border-bottom:1px solid var(--line)}
-.plays li:last-child{border-bottom:0}
-.clock{font:700 1.15rem var(--display);color:var(--muted)}
-.who b{font-weight:600}
-.who small{display:block;color:var(--muted)}
-.play{display:inline-flex;align-items:center;gap:.4rem;border:2px solid var(--ink);background:none;color:var(--ink);font:700 1rem var(--display);letter-spacing:.04em;padding:.3rem .8rem;border-radius:999px;cursor:pointer}
+.plays li{border-bottom:1px solid var(--line)}.plays li:last-child{border:0}
+.pl{display:grid;grid-template-columns:3.8rem 1fr auto;gap:.75rem;align-items:center;padding:.65rem 1.25rem}
+.clock{font:700 1.15rem var(--d);color:var(--muted)}.who small{display:block;color:var(--muted)}
+.tag{font:700 .8rem var(--d);border:1px solid var(--line);padding:0 .35rem;margin-left:.4rem;color:var(--muted)}
+.play{border:2px solid var(--ink);background:none;color:var(--ink);font:700 1rem var(--d);letter-spacing:.04em;padding:.25rem .85rem;border-radius:999px;cursor:pointer}
 .play:hover{background:var(--ink);color:var(--paper)}
-.play svg{width:.8rem;height:.8rem;fill:currentColor}
-.leaders{margin:2rem 0 0}
-.leaders h2{font:800 1.8rem var(--display);margin:0 0 .5rem}
-.leaders ol{margin:0;padding:0;list-style:none;border-top:2px solid var(--ink)}
-.leaders li{display:flex;justify-content:space-between;padding:.5rem 0;border-bottom:1px solid var(--line)}
-.sample{color:var(--muted);font-size:.85rem;margin-top:2rem}
-dialog{border:0;padding:0;width:min(760px,94vw);background:var(--paper);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.45)}
-dialog::backdrop{background:rgba(6,12,20,.75)}
-dialog[open]{animation:pop .18s ease-out}
-@keyframes pop{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
-.dhead{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;padding:1rem 1.25rem}
-.dhead h3{font:800 1.7rem/1.1 var(--display);margin:0}
-.dhead p{margin:.15rem 0 0;color:var(--muted)}
-.close{border:2px solid var(--ink);background:none;color:var(--ink);font:700 1rem var(--display);padding:.25rem .8rem;border-radius:999px;cursor:pointer}
-.video{aspect-ratio:16/9;background:#05090F;display:grid;place-items:center;color:#9FB0C0;text-align:center;padding:1rem}
-.video iframe{width:100%;height:100%;border:0}
-@media (prefers-reduced-motion:reduce){dialog[open]{animation:none}}
-@media (max-width:520px){.plays li{grid-template-columns:3rem 1fr}.plays .play{grid-column:2;justify-self:start}.totals{gap:1.5rem}}
+.clip{padding:0 1.25rem 1rem}.clip video,.clip iframe{width:100%;aspect-ratio:16/9;border:0;background:#05090F;display:block;margin-bottom:.4rem}
+.noclip{padding:1.5rem;background:#05090F;color:#9FB0C2;margin-bottom:.4rem}
+.clip a{color:var(--ink);font-size:.9rem}
+.tot{display:flex;gap:2.2rem;border-bottom:2px solid var(--ink);padding-bottom:.9rem;margin-bottom:1.2rem}
+.tot b{display:block;font:800 2.6rem/1 var(--d)}.tot span{color:var(--muted);font-size:.9rem}
+@media (max-width:520px){.pl{grid-template-columns:3rem 1fr}.pl .play{grid-column:2;justify-self:start}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div>
-      <h1>Last night's scoring</h1>
-      <p class="date" id="date"></p>
-    </div>
-    <div class="tabs" role="group" aria-label="Sport">
-      <button data-sport="NHL" aria-pressed="true">NHL</button>
-      <button data-sport="NFL" aria-pressed="false">NFL</button>
-    </div>
-  </header>
-
-  <div class="totals" id="totals"></div>
-  <main id="games"></main>
-  <section class="leaders" id="leaders"></section>
-  <p class="sample" id="sampleNote">Sample data for design only. Run fetch_goals.py to load real games.</p>
-</div>
-
-<dialog id="clip" aria-labelledby="clipTitle">
-  <div class="dhead">
-    <div><h3 id="clipTitle"></h3><p id="clipSub"></p></div>
-    <button class="close" id="closeClip">Close</button>
-  </div>
-  <div class="video" id="video"></div>
-</dialog>
-
+<header class="top">
+  <div class="bar"><h1>Scoreboard</h1>
+    <nav id="tabs"><button data-tab="scores">Scores</button><button data-tab="NHL">NHL</button><button data-tab="NFL">NFL</button></nav></div>
+  <div class="ticker" id="ticker"></div>
+</header>
+<main class="wrap" id="view"></main>
 <script src="data.js"></script>
 <script>
-/* ---------- SAMPLE DATA (Stage 3 replaces this with a real file) ----------
-   t = minutes into the game (0-60). v = YouTube video ID of the official clip, or null. */
-const SAMPLE = [
- {sport:"NHL", status:"Final", away:{n:"Toronto",c:"#00205B",s:4}, home:{n:"Boston",c:"#FFB81C",s:3}, plays:[
-  {t:6,  clock:"1st 6:12",  team:"away", who:"A. Marner",  assist:"J. Tavares",  type:"Goal", v:null},
-  {t:14, clock:"1st 14:40", team:"home", who:"D. Pastrnak",assist:"B. Marchand", type:"Power-play goal", v:null},
-  {t:27, clock:"2nd 7:05",  team:"away", who:"A. Matthews",assist:"W. Nylander", type:"Goal", v:null},
-  {t:33, clock:"2nd 13:51", team:"home", who:"C. Coyle",   assist:"unassisted",  type:"Goal", v:null},
-  {t:44, clock:"3rd 4:20",  team:"home", who:"B. Marchand",assist:"D. Pastrnak", type:"Goal", v:null},
-  {t:52, clock:"3rd 12:08", team:"away", who:"M. Rielly",  assist:"A. Matthews", type:"Goal", v:null},
-  {t:59, clock:"3rd 19:02", team:"away", who:"W. Nylander",assist:"empty net",   type:"Empty-net goal", v:null}]},
- {sport:"NHL", status:"Final / OT", away:{n:"Edmonton",c:"#FF4C00",s:3}, home:{n:"Vegas",c:"#B4975A",s:2}, plays:[
-  {t:9,  clock:"1st 9:30",  team:"home", who:"J. Eichel",  assist:"M. Stone",    type:"Goal", v:null},
-  {t:31, clock:"2nd 11:15", team:"away", who:"L. Draisaitl",assist:"C. McDavid", type:"Power-play goal", v:null},
-  {t:48, clock:"3rd 8:44",  team:"home", who:"I. Barbashev",assist:"J. Eichel",  type:"Goal", v:null},
-  {t:57, clock:"3rd 17:21", team:"away", who:"Z. Hyman",   assist:"E. Kane",     type:"Goal", v:null},
-  {t:63, clock:"OT 3:02",   team:"away", who:"C. McDavid", assist:"L. Draisaitl",type:"Overtime winner", v:null}]},
- {sport:"NFL", status:"Final", away:{n:"Kansas City",c:"#E31837",s:27}, home:{n:"Buffalo",c:"#00338D",s:24}, plays:[
-  {t:7,  clock:"Q1 7:48",  team:"home", who:"J. Cook",     assist:"2-yd run",              type:"Rushing TD", v:null},
-  {t:19, clock:"Q2 4:10",  team:"away", who:"T. Kelce",    assist:"18-yd pass from P. Mahomes", type:"Receiving TD", v:null},
-  {t:28, clock:"Q2 13:36", team:"home", who:"K. Coleman",  assist:"41-yd pass from J. Allen",   type:"Receiving TD", v:null},
-  {t:41, clock:"Q3 4:55",  team:"away", who:"I. Pacheco",  assist:"9-yd run",              type:"Rushing TD", v:null},
-  {t:56, clock:"Q4 11:02", team:"away", who:"R. Rice",     assist:"33-yd pass from P. Mahomes", type:"Receiving TD", v:null}]}
-];
-/* data.js (written by fetch_goals.py) holds real games; without it the page shows the sample. */
-const LIVE = Array.isArray(window.LIVE_GAMES);
-const GAMES = LIVE ? window.LIVE_GAMES : SAMPLE;
-
-const sportColor = {NHL:"var(--goal)", NFL:"var(--turf)"};
-let sport = "NHL";
+const GAMES = window.LIVE_GAMES || [];
+let SCORES = [], feedOk = false, tab = "scores";
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const mark = t => t.logo
-  ? `<picture>${t.logoDark ? `<source media="(prefers-color-scheme: dark)" srcset="${esc(t.logoDark)}">` : ""}<img class="logo" src="${esc(t.logo)}" alt="" data-c="${esc(t.c)}"></picture>`
-  : `<span class="chip" style="background:${t.c}"></span>`;
-document.addEventListener("error", e => {  /* if a logo fails to load, fall back to the color bar */
-  const el = e.target;
-  if (el.classList && el.classList.contains("logo")) {
-    const chip = document.createElement("span");
-    chip.className = "chip"; chip.style.background = el.dataset.c;
-    (el.closest("picture") || el).replaceWith(chip);
-  }
-}, true);
+const mark = t => t.logo ? `<picture>${t.logoDark ? `<source media="(prefers-color-scheme: dark)" srcset="${esc(t.logoDark)}">` : ""}<img class="logo" src="${esc(t.logo)}" alt="" onerror="this.style.visibility='hidden'"></picture>` : "";
 
+/* ---- live scores, fetched straight from the NHL and ESPN in the visitor's browser ---- */
+const per = d => !d ? "" : d.periodType === "OT" ? "OT" : d.periodType === "SO" ? "SO" : ["","1st","2nd","3rd"][d.number] || d.number + "th";
+const nhlT = t => ({ab:t.abbrev, logo:t.logo, logoDark:t.darkLogo, s:t.score});
+const nhlS = g => { const st = {LIVE:"live",CRIT:"live",FINAL:"final",OFF:"final"}[g.gameState] || "pre", pt = (g.periodDescriptor||{}).periodType;
+  return {league:"NHL", away:nhlT(g.awayTeam), home:nhlT(g.homeTeam), state:st,
+    detail: st==="live" ? per(g.periodDescriptor)+" "+((g.clock||{}).inIntermission ? "INT" : (g.clock||{}).timeRemaining||"")
+          : st==="final" ? "Final"+(pt==="OT"||pt==="SO" ? " / "+pt : "")
+          : new Date(g.startTimeUTC).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"})}; };
+const nflS = ev => { const c = ev.competitions[0].competitors, t = ev.status.type;
+  const f = h => { const x = c.find(z => z.homeAway === h), l = x.team.logo; return {ab:x.team.abbreviation, logo:l, logoDark:l && l.replace("/500/","/500-dark/"), s:x.score}; };
+  return {league:"NFL", away:f("away"), home:f("home"), state:{in:"live",post:"final"}[t.state] || "pre", detail:t.shortDetail}; };
+const finalOf = g => ({league:g.sport, state:"final", detail:g.status,
+  away:{ab:g.away.n, logo:g.away.logo, logoDark:g.away.logoDark, s:g.away.s}, home:{ab:g.home.n, logo:g.home.logo, logoDark:g.home.logoDark, s:g.home.s}});
+const getJ = async u => { const r = await fetch(u); if (!r.ok) throw 0; return r.json(); };
+async function loadLive(){
+  const [a, b] = await Promise.allSettled([getJ("https://api-web.nhle.com/v1/score/now"), getJ("https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard")]);
+  const out = [];
+  try { if (a.status === "fulfilled") out.push(...a.value.games.map(nhlS)); } catch(e){}
+  try { if (b.status === "fulfilled") out.push(...b.value.events.map(nflS)); } catch(e){}
+  feedOk = a.status === "fulfilled" || b.status === "fulfilled";
+  SCORES = out.length ? out : GAMES.map(finalOf);
+  ticker(); if (tab === "scores") render();
+}
 
+/* ---- views ---- */
+const sd = (t, g, other) => { const lose = g.state === "final" && +t.s < +other.s;
+  return `<div class="sd ${lose ? "l" : ""}">${mark(t)}<b>${esc(t.ab)}</b><span>${g.state === "pre" ? "" : esc(t.s ?? "")}</span></div>`; };
+const tile = g => `<div class="tile ${g.state}"><div class="meta"><span>${g.league}</span><span>${g.state === "live" ? '<i class="dot"></i>' : ""}${esc(g.detail)}</span></div>${sd(g.away, g, g.home)}${sd(g.home, g, g.away)}</div>`;
+function ticker(){ $("ticker").innerHTML = SCORES.map(g => `<div class="tk"><small>${g.league} · ${esc(g.detail)}</small><span>${esc(g.away.ab)}</span><span>${g.state==="pre"?"":esc(g.away.s)}</span><span>${esc(g.home.ab)}</span><span>${g.state==="pre"?"":esc(g.home.s)}</span></div>`).join(""); }
+function scoresView(){
+  const body = [["Live now","live"],["Final","final"],["Upcoming","pre"]].map(([t, s]) => { const l = SCORES.filter(g => g.state === s);
+    return l.length ? `<h2>${t}</h2><div class="grid">${l.map(tile).join("")}</div>` : ""; }).join("");
+  return (feedOk ? "" : `<p class="note">The live feed isn't reachable right now, so this shows the last saved results.</p>`) + (body || `<p class="note">No games found.</p>`);
+}
+function leagueView(lg){
+  const games = GAMES.filter(g => g.sport === lg), plays = games.flatMap(g => g.plays);
+  if (!games.length) return `<p class="note">No ${lg} games saved for last night.</p>`;
+  const fg = plays.filter(p => p.kind === "fg").length, main = plays.length - fg;
+  const when = window.LIVE_DATE ? new Date(window.LIVE_DATE + "T12:00:00").toLocaleDateString(undefined, {weekday:"long", month:"long", day:"numeric"}) : "";
+  const tot = `<div class="tot"><div><b>${games.length}</b><span>games</span></div><div><b>${main}</b><span>${lg === "NHL" ? "goals" : "touchdowns"}</span></div>${lg === "NFL" ? `<div><b>${fg}</b><span>field goals</span></div>` : ""}</div>`;
+  return `<h2 style="margin-top:0">${lg} results${when ? " · " + when : ""}</h2>${tot}` + games.map(g => {
+    const aw = +g.away.s > +g.home.s, gi = GAMES.indexOf(g), total = Math.max(60, ...g.plays.map(p => p.t + 1));
+    const dots = g.plays.map(p => `<i class="${p.kind === "fg" ? "fg" : ""}" style="left:${(p.t / total * 100).toFixed(1)}%" title="${esc(p.clock + " " + p.who)}"></i>`).join("");
+    const rows = g.plays.map((p, pi) => `<li><div class="pl"><span class="clock">${esc(p.clock)}</span>
+      <span class="who"><b>${esc(p.who)}</b> · ${esc((p.team === "away" ? g.away : g.home).n)}${p.kind === "fg" ? '<span class="tag">FG</span>' : ""}<small>${esc(p.type)} – ${esc(p.assist)}</small></span>
+      <button class="play" data-g="${gi}" data-p="${pi}">▶ Watch</button></div><div class="clip" hidden></div></li>`).join("");
+    return `<article class="game"><div class="sc"><div class="tm ${aw ? "" : "lose"}">${mark(g.away)}${esc(g.away.n)}</div><div class="num ${aw ? "" : "lose"}">${g.away.s}</div>
+      <div class="tm ${aw ? "lose" : ""}">${mark(g.home)}${esc(g.home.n)}</div><div class="num ${aw ? "lose" : ""}">${g.home.s}</div></div>
+      <div class="st">${esc(g.status)}</div><div class="strip" aria-hidden="true">${dots}</div><ul class="plays">${rows}</ul></article>`; }).join("");
+}
 function render(){
-  const games = GAMES.filter(g => g.sport === sport);
-  const unit = sport === "NHL" ? "goals" : "touchdowns";
-  $("sampleNote").hidden = LIVE;
-  const plays = games.flatMap(g => g.plays);
-  $("totals").innerHTML =
-    `<div><b>${games.length}</b><span>games</span></div><div><b>${plays.length}</b><span>${unit}</span></div>`;
-
-  if (!games.length) {
-    $("games").innerHTML = `<p style="color:var(--muted)">No ${sport} games loaded for this night.</p>`;
-    $("leaders").innerHTML = ""; $("games").dataset.g = "[]";
-    return;
-  }
-  $("games").innerHTML = games.map((g,gi) => {
-    const awayWin = g.away.s > g.home.s;
-    const total = Math.max(60, ...g.plays.map(p => p.t + 1));
-    const dots = g.plays.map(p => {
-      const c = (p.team === "away" ? g.away : g.home).c;
-      return `<i style="left:${(p.t/total*100).toFixed(1)}%;--c:${c}" title="${esc(p.clock)} ${esc(p.who)}"></i>`;
-    }).join("");
-    const ticks = [15,30,45].map(m => `<u style="left:${m/total*100}%"></u>`).join("");
-    const rows = g.plays.map((p,pi) => {
-      const tm = p.team === "away" ? g.away : g.home;
-      return `<li>
-        <span class="clock">${esc(p.clock)}</span>
-        <span class="who"><b>${esc(p.who)}</b> &middot; ${esc(tm.n)}<small>${esc(p.type)} &ndash; ${esc(p.assist)}</small></span>
-        <button class="play" data-g="${gi}" data-p="${pi}" aria-label="Watch ${esc(p.who)} ${esc(p.type)}">
-          <svg viewBox="0 0 10 10"><path d="M1 0l9 5-9 5z"/></svg>Watch</button></li>`;
-    }).join("");
-    return `<article class="game">
-      <div class="score">
-        <div class="team ${awayWin?'':'lose'}">${mark(g.away)}${esc(g.away.n)}</div>
-        <div class="num ${awayWin?'':'lose'}">${g.away.s}</div>
-        <div class="team ${awayWin?'lose':''}">${mark(g.home)}${esc(g.home.n)}</div>
-        <div class="num ${awayWin?'lose':''}">${g.home.s}</div>
-      </div>
-      <div class="status">${esc(g.status)}</div>
-      <div class="strip" aria-hidden="true">${ticks}${dots}</div>
-      <ul class="plays">${rows}</ul></article>`;
-  }).join("");
-  $("games").dataset.g = JSON.stringify(games.map(g => GAMES.indexOf(g)));
-
-  const tally = {};
-  games.forEach(g => g.plays.forEach(p => {
-    const k = p.who; tally[k] = tally[k] || {n:0, team:(p.team==="away"?g.away:g.home).n}; tally[k].n++;
-  }));
-  const top = Object.entries(tally).sort((a,b) => b[1].n - a[1].n).slice(0,5);
-  $("leaders").innerHTML = `<h2>Most ${unit} last night</h2><ol>` +
-    top.map(([k,v]) => `<li><span>${esc(k)} <span style="color:var(--muted)">${esc(v.team)}</span></span><b>${v.n}</b></li>`).join("") + `</ol>`;
+  document.querySelectorAll("#tabs button").forEach(b => b.setAttribute("aria-pressed", b.dataset.tab === tab));
+  $("view").innerHTML = tab === "scores" ? scoresView() : leagueView(tab);
 }
+const embed = p => { const e = p.embed;
+  const m = !e ? `<div class="noclip">No embeddable clip for this play yet.</div>`
+    : e.kind === "video" ? `<video src="${esc(e.src)}" controls autoplay playsinline></video>`
+    : `<iframe src="${esc(e.src)}" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+  return m + `<a href="${esc(p.url)}" target="_blank" rel="noopener">${p.exact ? "Open the clip in a new tab" : "Search for the clip"}</a>`; };
 
-function openClip(gi, pi){
-  const idx = JSON.parse($("games").dataset.g)[gi];
-  const g = GAMES[idx], p = g.plays[pi];
-  $("clipTitle").textContent = `${p.who} \u2013 ${p.type}`;
-  $("clipSub").textContent = `${g.away.n} at ${g.home.n} \u00b7 ${p.clock}`;
-  $("video").innerHTML = p.v
-    ? `<iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(p.v)}?autoplay=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="Highlight clip"></iframe>`
-    : p.url
-    ? `<div><a href="${esc(p.url)}" target="_blank" rel="noopener" style="color:#fff;font:700 1.5rem var(--display)">${p.exact ? "Open the clip" : "Search for the clip"}</a><br>Opens in a new tab.</div>`
-    : `<div>The official clip will play here.<br>No clip is attached to this sample play yet.</div>`;
-  $("clip").showModal();
-}
-function closeClip(){ $("clip").close(); $("video").innerHTML = ""; }
-
-document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
-  sport = b.dataset.sport;
-  document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-pressed", x === b));
-  render();
-}));
-$("games").addEventListener("click", e => {
-  const b = e.target.closest(".play"); if (b) openClip(+b.dataset.g, +b.dataset.p);
+document.querySelectorAll("#tabs button").forEach(b => b.addEventListener("click", () => { tab = b.dataset.tab; render(); }));
+$("view").addEventListener("click", e => {
+  const b = e.target.closest(".play"); if (!b) return;
+  const box = b.closest("li").querySelector(".clip"), wasOpen = !box.hidden;
+  document.querySelectorAll(".clip").forEach(c => { c.hidden = true; c.innerHTML = ""; });
+  if (wasOpen) return;
+  box.innerHTML = embed(GAMES[+b.dataset.g].plays[+b.dataset.p]); box.hidden = false;
 });
-$("closeClip").addEventListener("click", closeClip);
-$("clip").addEventListener("click", e => { if (e.target === $("clip")) closeClip(); });
-$("clip").addEventListener("close", () => { $("video").innerHTML = ""; });
-
-$("date").textContent = (window.LIVE_DATE ? new Date(window.LIVE_DATE + "T12:00:00") : new Date(Date.now() - 864e5)).toLocaleDateString(undefined, {weekday:"long", month:"long", day:"numeric"});
-render();
+SCORES = GAMES.map(finalOf); ticker(); render(); loadLive(); setInterval(loadLive, 30000);
 </script>
 </body>
 </html>
