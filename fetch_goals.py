@@ -114,7 +114,17 @@ def yt_results(query):
 
 
 def yt_embeddable(video_id):
+    """True only if YouTube itself says the video can play on other websites (the NFL's own uploads usually say no)."""
     try:
+        req = urllib.request.Request("https://www.youtube.com/watch?v=" + video_id,
+                                     headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+                                              "Accept-Language": "en-US,en;q=0.9", "Cookie": "CONSENT=YES+1; SOCS=CAI"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            html = resp.read().decode("utf-8", "replace")
+        m = re.search(r'"playableInEmbed"\s*:\s*(true|false)', html)
+        if m:
+            return m.group(1) == "true"
+        # could not read the flag: fall back to YouTube's oEmbed check
         get("https://www.youtube.com/oembed?format=json&url=" + urllib.parse.quote_plus("https://www.youtube.com/watch?v=" + video_id))
         return True
     except Exception:
@@ -124,8 +134,8 @@ def yt_embeddable(video_id):
 def yt_pick(query, must, avoid=()):
     """First result whose title mentions every word in `must` (and is allowed to be embedded). Official NFL uploads first."""
     res = [r for r in yt_results(query) if r["id"] not in avoid and all(w.lower() in r["title"].lower() for w in must if w)]
-    res.sort(key=lambda r: ("nfl" not in r["channel"].lower(), "highlight" not in r["title"].lower()))
-    for r in res[:3]:
+    res.sort(key=lambda r: ("highlight" not in r["title"].lower(), "nfl" not in r["channel"].lower()))
+    for r in res[:6]:  # keep going down the list until one that can really be played inside the page
         if yt_embeddable(r["id"]):
             return {"id": r["id"], "title": r["title"]}
     return None
@@ -405,7 +415,7 @@ def video_links(v):
     return href, mp4
 
 
-def parse_nfl_game(ev, date):
+def parse_nfl_game(ev, date, prev=None):
     comp = ev["competitions"][0]
     teams = {c["homeAway"]: nfl_team(c) for c in comp["competitors"]}
     away, home = teams["away"], teams["home"]
@@ -418,7 +428,11 @@ def parse_nfl_game(ev, date):
 
     # the game's own highlight video, and whether this game is recent enough to look for every play separately
     heads = nfl_heads(summary)
-    game_clip = yt_pick(f"{away['n']} {away['nick']} vs {home['n']} {home['nick']} highlights NFL {date[:4]}", [away["nick"], home["nick"]])
+    prev = prev or {}
+    old_yt = next((h.get("yt") for h in prev.get("hl", []) if h.get("yt")), None)
+    old_plays = {(p.get("who"), p.get("clock")): p for p in prev.get("plays", [])}
+    game_clip = ({"id": old_yt, "title": ""} if old_yt else
+                 yt_pick(f"{away['n']} {away['nick']} vs {home['n']} {home['nick']} highlights NFL {date[:4]}", [away["nick"], home["nick"]]))
     used_yt = {game_clip["id"]} if game_clip else set()
     try:
         recent = (datetime.now() - datetime.strptime(date, "%Y-%m-%d")).days <= 10
@@ -448,6 +462,9 @@ def parse_nfl_game(ev, date):
         exact = bool(url)
         embed = {"kind": "video", "src": mp4} if mp4 else None
         of_game = False
+        before = old_plays.get((who, f"{label} {int(mm)}:{ss}"))
+        if not embed and before and before.get("embed") and not before.get("ofGame"):
+            embed, url, exact = before["embed"], before["url"], True  # found on an earlier run: keep it
         if not embed:
             last = who.split()[-1] if who.split() else ""
             clip = None
@@ -549,7 +566,7 @@ def nfl_season(days, end):
                 if old and "hl" in old[1] and (last - datetime.strptime(date, "%Y-%m-%d")).days >= REFRESH_NIGHTS:
                     continue
                 try:
-                    game = parse_nfl_game(ev, date)
+                    game = parse_nfl_game(ev, date, old[1] if old else None)
                 except Exception as err:
                     print(f"  NFL game {ev.get('id')} skipped: {err}")
                     continue
